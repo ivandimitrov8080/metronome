@@ -133,11 +133,14 @@ view model =
                         , style "height" "22px"
                         , style "border-radius" "50%"
                         , style "background"
-                            (if i == model.currentBeat && model.flash then
-                                "#2196f3"
+                            (if i == model.currentBeat then
+                                if i == 0 then
+                                    "#4caf50"
+                                    -- green for primary
 
-                             else if i == 0 then
-                                "#4caf50"
+                                else
+                                    "#2196f3"
+                                -- blue for subdivisions
 
                              else
                                 "#ddd"
