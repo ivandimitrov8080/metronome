@@ -15,14 +15,15 @@ type alias Model =
     { bpm : Int
     , running : Bool
     , flash : Bool
-    , beatsPerMeasure : Int
+    , tsNum : Int -- numerator (beats per measure)
+    , tsDen : Int -- denominator (note value that gets the beat)
     , currentBeat : Int
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { bpm = 120, running = False, flash = False, beatsPerMeasure = 4, currentBeat = 0 }
+    ( { bpm = 120, running = False, flash = False, tsNum = 4, tsDen = 4, currentBeat = 0 }
     , Cmd.none
     )
 
@@ -43,7 +44,7 @@ type Msg
     | DecrementBpm
     | SetBpm Int
     | StartStop
-    | SetBeatsPerMeasure Int
+    | SetTimeSig Int Int
     | Beat
 
 
@@ -70,14 +71,14 @@ update msg model =
         SetBpm bpmVal ->
             ( { model | bpm = bpmVal }, Cmd.none )
 
-        SetBeatsPerMeasure n ->
-            ( { model | beatsPerMeasure = n, currentBeat = 0 }, Cmd.none )
+        SetTimeSig newNum newDen ->
+            ( { model | tsNum = newNum, tsDen = newDen, currentBeat = 0 }, Cmd.none )
 
         Beat ->
             if model.running then
                 let
                     nextBeat =
-                        if model.currentBeat + 1 >= model.beatsPerMeasure then
+                        if model.currentBeat + 1 >= model.tsNum then
                             0
 
                         else
@@ -107,7 +108,7 @@ subscriptions model =
     if model.running then
         let
             interval =
-                60000 // model.bpm
+                (60000 // model.bpm) * (4 // model.tsDen)
         in
         Time.every (toFloat interval) (\_ -> Beat)
 
@@ -152,7 +153,7 @@ view model =
                         ]
                         []
                 )
-                (List.range 0 (model.beatsPerMeasure - 1))
+                (List.range 0 (model.tsNum - 1))
 
         bpmSlider =
             div []
@@ -161,17 +162,59 @@ view model =
                 , span [ style "margin-left" "10px" ] [ text (String.fromInt model.bpm) ]
                 ]
 
-        timeSigOptions =
-            [ 2, 3, 4, 5, 6, 7, 8 ]
+        timeSigList =
+            [ ( 2, 4 )
+            , ( 3, 4 )
+            , ( 4, 4 )
+            , ( 5, 4 )
+            , ( 6, 4 )
+            , ( 7, 4 )
+            , ( 3, 8 )
+            , ( 5, 8 )
+            , ( 6, 8 )
+            , ( 7, 8 )
+            , ( 9, 8 )
+            , ( 11, 8 )
+            , ( 12, 8 )
+            , ( 5, 16 )
+            , ( 6, 16 )
+            , ( 7, 16 )
+            , ( 9, 16 )
+            , ( 12, 16 )
+            ]
 
         timesigSelect =
             div [ style "margin" "1em 0" ]
-                [ span [] [ text "Beats / Measure: " ]
+                [ span [] [ text "Time Signature: " ]
                 , Html.select
-                    [ Html.Events.onInput (String.toInt >> Maybe.withDefault model.beatsPerMeasure >> SetBeatsPerMeasure) ]
+                    [ Html.Events.onInput
+                        (\str ->
+                            case String.split "/" str of
+                                [ numStr, denStr ] ->
+                                    case ( String.toInt numStr, String.toInt denStr ) of
+                                        ( Just num, Just den ) ->
+                                            SetTimeSig num den
+
+                                        _ ->
+                                            SetTimeSig model.tsNum model.tsDen
+
+                                _ ->
+                                    SetTimeSig model.tsNum model.tsDen
+                        )
+                    ]
                     (List.map
-                        (\n -> Html.option [ Html.Attributes.value (String.fromInt n), Html.Attributes.selected (model.beatsPerMeasure == n) ] [ text (String.fromInt n) ])
-                        timeSigOptions
+                        (\( num, den ) ->
+                            let
+                                shown =
+                                    String.fromInt num ++ "/" ++ String.fromInt den
+                            in
+                            Html.option
+                                [ Html.Attributes.value shown
+                                , Html.Attributes.selected (model.tsNum == num && model.tsDen == den)
+                                ]
+                                [ text shown ]
+                        )
+                        timeSigList
                     )
                 ]
     in

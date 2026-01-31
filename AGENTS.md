@@ -14,25 +14,17 @@ This document outlines the essential build, lint, test, and style processes for 
 
 - **Standard Build:**
   ```
-  elm make Main.elm
+  devenv tasks run build
   ```
-  This outputs `index.html` by default.
-- **Production Build:**
-  Adapt with appropriate flags if needed (e.g., --optimize for prod).
+  This outputs `elm.js` by default.
 
 ### **B. Linting and Formatting**
 
 - **elm-format:**  
-  Format all source code according to the community Elm Style Guide.
+  Format all source code according to nix.
   ```
-  elm-format . --yes
+  nix fmt
   ```
-  or for a specific file:
-  ```
-  elm-format Main.elm --yes
-  ```
-- **Additional tooling:**  
-  If using Nix/devShell, `elmPackages.elm-format` will be available automatically in the environment.
 
 ### **C. Testing**
 
@@ -41,34 +33,11 @@ This document outlines the essential build, lint, test, and style processes for 
 
 **When tests are present:**
 
-- **Install the test runner** (if not yet installed):
-  ```
-  npm install -g elm-test
-  ```
-- **Run all tests:**
-  ```
-  elm-test
-  ```
-- **Run a single test file:**
-  ```
-  elm-test tests/MyModuleTest.elm
-  ```
-  > Within a file, use `only` to focus on a particular test:
-  >
-  > ```elm
-  > only <| test "runs just this" <| \_ -> ...
-  > ```
-- **Watch mode:**
-  ```
-  elm-test --watch
-  ```
-  > (Continuously runs tests on file changes.)
-
 ### **D. Cleaning Build Artifacts**
 
 - **Clean generated HTML:**
   ```
-  rm -rf index.html
+  devenv tasks run clean
   ```
 
 ---
