@@ -75,67 +75,6 @@
             };
           };
       };
-      client = {
-        default =
-          { pkgs, ... }:
-          {
-            environment.systemPackages = with pkgs; [
-              curl
-              gnugrep
-            ];
-            systemd.network.enable = true;
-            networking.useNetworkd = true;
-          };
-      };
-      server = {
-        default =
-          { ... }:
-          {
-            _module.args.system = "x86_64-linux";
-            imports = [ nixosModules.default ];
-            networking = {
-              useNetworkd = true;
-              firewall = {
-                allowedTCPPorts = [
-                  80
-                  443
-                ];
-                allowedUDPPorts = [
-                  80
-                  443
-                ];
-              };
-            };
-            systemd.network.enable = true;
-            webshite.enable = true;
-            services.nginx.enable = true;
-            security = {
-              acme = {
-                defaults = {
-                  server = "https://acme-staging-v02.api.letsencrypt.org/directory";
-                  email = "test@example.com";
-                };
-                acceptTerms = true;
-              };
-            };
-          };
-      };
-      nixosTest = {
-        name = "test";
-        nodes = {
-          server = server.default;
-          client1 = client.default;
-        };
-        testScript =
-          #py
-          ''
-            start_all()
-            client1.wait_for_unit("default.target")
-            server.wait_for_unit("nginx.service")
-            client1.succeed("curl http://server | grep -o '301'")
-            client1.succeed("curl -k https://server | grep -o 'Home | idimitrov.dev'")
-          '';
-      };
       packages = eachSystem (
         system:
         let
@@ -154,7 +93,6 @@
             version = "1.0";
             src = ./.;
             nativeBuildInputs = with pkgs; [
-              (ghc.withPackages (p: with p; [ hakyll ]))
               elmPackages.elm
             ];
             env = {
@@ -180,15 +118,6 @@
           };
         }
       );
-      checks = eachSystem (
-        system:
-        let
-          pkgs = mkPkgs system;
-        in
-        {
-          default = pkgs.testers.runNixOSTest nixosTest;
-        }
-      );
       devShells = eachSystem (
         system:
         let
@@ -212,26 +141,6 @@
               {
                 devenv.root = "/home/ivand/src/idimitrov.dev";
                 packages = with pkgs; [
-                  (ghc.withPackages (
-                    p: with p; [
-                      hakyll
-                      servant
-                      servant-server
-                      servant-auth
-                      servant-auth-server
-                      servant-elm
-                      hspec
-                      http-client
-                      http-types
-                      wai-cors
-                      hasql
-                      hasql-th
-                      hasql-pool
-                      tuple
-                      password
-                    ]
-                  ))
-                  haskellPackages.hakyll
                   elmPackages.elm
                   elmPackages.elm-format
                   elmPackages.elm-json
@@ -239,36 +148,15 @@
                   (nixvim.web.extend {
                     lsp.servers = {
                       elmls.enable = true;
-                      hls.enable = true;
                     };
                   })
                   nodePackages.browser-sync
                   watchexec
                 ];
-                services = {
-                  postgres = {
-                    enable = true;
-                    initialDatabases = [
-                      {
-                        name = "postgres";
-                        pass = "postgres";
-                        user = "postgres";
-                        schema = ./schema.sql;
-                      }
-                    ];
-                    initialScript = ''
-                      CREATE ROLE postgres SUPERUSER;
-                      CREATE USER postgres WITH ENCRYPTED PASSWORD 'postgres' ROLE postgres;
-                    '';
-                  };
-                };
                 processes =
                   let
-                    siteWatch = "bin/site watch";
-                    server = "bin/server";
-                    browserSync = "browser-sync start --proxy localhost:8000 --files '_site/**/*'";
-                    serverWatcher = "watchexec -w server --exts hs -- process-compose process restart server";
-                    apiWatcher = "watchexec -w server -f Api.hs -- devenv tasks run build:library --mode before";
+                    browserSync = "browser-sync start --server --files 'index.html'";
+                    watcher = "watchexec -w Main.elm -- devenv tasks run build";
                     syncElmDeps =
                       pkgs.writeScript "sync_elm_deps"
                         # bash
@@ -283,58 +171,16 @@
                       '';
                   in
                   {
-                    site.exec = siteWatch;
-                    server.exec = server;
                     browser-sync.exec = browserSync;
-                    elm-watcher.exec = elm2nixWatcher;
-                    server-watcher.exec = serverWatcher;
-                    api-watcher.exec = apiWatcher;
+                    watcher.exec = watcher;
+                    elm2nix-watcher.exec = elm2nixWatcher;
                   };
                 tasks = {
-                  "clean:site" = {
-                    exec = "rm -rf bin _site _cache";
+                  "clean:all" = {
+                    exec = "rm -rf index.html";
                   };
-                  "build:init" = {
-                    exec = ''
-                      mkdir -p bin/
-                      mkdir -p _cache/{tmp,site,server,generators}
-                    '';
-                    before = [
-                      "build:server"
-                      "build:site"
-                      "build:generators"
-                    ];
-                  };
-                  "build:server" = {
-                    exec = "ghc -threaded -outputdir _cache/server server/Main.hs -iserver -o bin/server";
-                    before = [ "devenv:processes:server" ];
-                  };
-                  "build:frontend" = {
-                    exec = "bin/site build";
-                    after = [ "build:site" ];
-                    before = [ "devenv:processes:site" ];
-                  };
-                  "build:site" = {
-                    exec = "ghc -outputdir _cache/site site.hs -o bin/site";
-                    before = [ "build:frontend" ];
-                  };
-                  "build:library" = {
-                    exec = ''
-                      bin/gen
-                      elm-format --yes src/Generated/Api.elm
-                    '';
-                    before = [ "build:site" ];
-                  };
-                  "build:generators" = {
-                    exec = ''
-                      ghc -outputdir _cache/generators generators/Main.hs -iserver -o bin/gen
-                    '';
-                    before = [ "build:library" ];
-                  };
-                  "browsersync:reload" = {
-                    exec = "browser-sync reload";
-                    before = [ "devenv:processes:server" ];
-                    after = [ "build:server" ];
+                  "build:all" = {
+                    exec = "elm make Main.elm";
                   };
                 };
                 git-hooks.hooks = {
@@ -343,10 +189,6 @@
                   elm-format.enable = true;
                   deadnix.enable = true;
                   statix.enable = true;
-                  ormolu.enable = true;
-                  ormolu.settings.defaultExtensions = [
-                    "ImportQualifiedPost"
-                  ];
                 };
               }
             ];
@@ -366,17 +208,12 @@
             elm-format.enable = true;
             deadnix.enable = true;
             statix.enable = true;
-            ormolu.enable = true;
-            ormolu.ghcOpts = [
-              "ImportQualifiedPost"
-            ];
           };
         }).config.build.wrapper
       );
     in
     {
       inherit
-        checks
         devShells
         formatter
         nixosModules
