@@ -108,9 +108,9 @@ subscriptions model =
     if model.running then
         let
             interval =
-                (60000 // model.bpm) * (4 // model.tsDen)
+                60000 / toFloat model.bpm
         in
-        Time.every (toFloat interval) (\_ -> Beat)
+        Time.every interval (\_ -> Beat)
 
     else
         Sub.none
