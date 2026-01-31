@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Basics exposing (clamp)
 import Browser
 import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (style)
@@ -15,6 +16,7 @@ import Time
 
 type alias Model =
     { bpm : Int
+    , bpmInput : String
     , running : Bool
     , flash : Bool
     , tsNum : Int -- numerator (beats per measure)
@@ -25,7 +27,7 @@ type alias Model =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { bpm = 120, running = False, flash = False, tsNum = 4, tsDen = 4, currentBeat = 0 }
+    ( { bpm = 120, bpmInput = "120", running = False, flash = False, tsNum = 4, tsDen = 4, currentBeat = 0 }
     , Cmd.none
     )
 
@@ -45,6 +47,8 @@ type Msg
     = IncrementBpm
     | DecrementBpm
     | SetBpm Int
+    | SetBpmInput String
+    | SetBpmFromInput
     | StartStop
     | SetTimeSig Int Int
     | Beat
@@ -59,10 +63,18 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         IncrementBpm ->
-            ( { model | bpm = model.bpm + 1 }, Cmd.none )
+            let
+                newBpm =
+                    model.bpm + 1
+            in
+            ( { model | bpm = newBpm, bpmInput = String.fromInt newBpm }, Cmd.none )
 
         DecrementBpm ->
-            ( { model | bpm = max 20 (model.bpm - 1) }, Cmd.none )
+            let
+                newBpm =
+                    max 20 (model.bpm - 1)
+            in
+            ( { model | bpm = newBpm, bpmInput = String.fromInt newBpm }, Cmd.none )
 
         StartStop ->
             if model.running then
@@ -72,7 +84,22 @@ update msg model =
                 ( { model | running = True, currentBeat = -1 }, Cmd.none )
 
         SetBpm bpmVal ->
-            ( { model | bpm = bpmVal }, Cmd.none )
+            ( { model | bpm = bpmVal, bpmInput = String.fromInt bpmVal }, Cmd.none )
+
+        SetBpmInput str ->
+            ( { model | bpmInput = str }, Cmd.none )
+
+        SetBpmFromInput ->
+            case String.toInt model.bpmInput of
+                Just v ->
+                    let
+                        clamped =
+                            clamp 30 240 v
+                    in
+                    ( { model | bpm = clamped, bpmInput = String.fromInt clamped }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         SetTimeSig newNum newDen ->
             ( { model | tsNum = newNum, tsDen = newDen, currentBeat = 0 }, Cmd.none )
@@ -163,10 +190,10 @@ view model =
                 (List.range 0 (model.tsNum - 1))
 
         bpmSlider =
-            div []
+            div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
                 [ span [] [ text "BPM: " ]
                 , inputSlider model.bpm
-                , span [ style "margin-left" "10px" ] [ text (String.fromInt model.bpm) ]
+                , inputBpmBox model
                 ]
 
         timeSigList =
@@ -251,6 +278,21 @@ inputSlider bpmVal =
         , Html.Attributes.max "240"
         , Html.Attributes.value (String.fromInt bpmVal)
         , Html.Events.onInput (String.toInt >> Maybe.withDefault bpmVal >> SetBpm)
+        ]
+        []
+
+
+inputBpmBox : Model -> Html Msg
+inputBpmBox model =
+    Html.input
+        [ Html.Attributes.type_ "number"
+        , Html.Attributes.min "30"
+        , Html.Attributes.max "240"
+        , Html.Attributes.value model.bpmInput
+        , Html.Attributes.style "width" "60px"
+        , Html.Attributes.style "margin-left" "10px"
+        , Html.Events.onInput SetBpmInput
+        , Html.Events.onBlur SetBpmFromInput
         ]
         []
 
