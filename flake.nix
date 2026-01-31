@@ -155,7 +155,7 @@
                 ];
                 processes =
                   let
-                    browserSync = "browser-sync start --server --files 'index.html'";
+                    browserSync = "browser-sync start --server --files index.html elm.js ports.js";
                     watcher = "watchexec -- devenv tasks run build";
                     syncElmDeps =
                       pkgs.writeScript "sync_elm_deps"
@@ -177,10 +177,10 @@
                   };
                 tasks = {
                   "clean:all" = {
-                    exec = "rm -rf index.html";
+                    exec = "rm -rf elm.js";
                   };
                   "build:all" = {
-                    exec = "elm make Main.elm";
+                    exec = "elm make Main.elm --output elm.js";
                   };
                 };
                 git-hooks.hooks = {

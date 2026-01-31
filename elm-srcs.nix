@@ -15,14 +15,14 @@
     version = "1.0.1";
   };
 
-  "elm/json" = {
-    sha256 = "0w1n61m2b9zbwp1yx8zhvir7gqy66mkm22rpq8hmnvgkcwnhxalb";
-    version = "1.1.4";
-  };
-
   "elm/time" = {
     sha256 = "0vch7i86vn0x8b850w1p69vplll1bnbkp8s383z7pinyg94cm2z1";
     version = "1.0.0";
+  };
+
+  "elm/json" = {
+    sha256 = "0w1n61m2b9zbwp1yx8zhvir7gqy66mkm22rpq8hmnvgkcwnhxalb";
+    version = "1.1.4";
   };
 
   "elm/url" = {
