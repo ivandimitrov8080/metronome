@@ -1,5 +1,14 @@
 port module Main exposing (main)
 
+{-|
+
+
+# Metronome Main Module
+
+This module implements a customizable metronome app, supporting various time signatures, subdivisions, and BPM controls.
+
+-}
+
 import Basics exposing (clamp)
 import Browser
 import Html exposing (Html, button, div, span, text)
@@ -11,8 +20,11 @@ import Task
 import Time
 
 
+port beatClick : String -> Cmd msg
 
--- MODEL
+
+
+-- TYPES
 
 
 type alias Subdivision =
@@ -26,6 +38,24 @@ type alias TimeSigOptions =
     , denominator : Int
     , subdivisions : List Subdivision
     }
+
+
+type alias Model =
+    { bpm : Int
+    , bpmInput : String
+    , running : Bool
+    , flash : Bool
+    , tsNum : Int -- numerator (beats per measure)
+    , tsDen : Int -- denominator (note value that gets the beat)
+    , currentBeat : Int
+    , subTick : Int -- for tracking sub-beats (for subdivisions between main beats)
+    , showHighlight : Bool -- true=highlight dot, false=show all dots neutral
+    , subdivisionIdx : Int -- index of subdivision for current signature
+    }
+
+
+
+-- CONSTANTS
 
 
 allTimeSigs : List TimeSigOptions
@@ -92,18 +122,8 @@ allTimeSigs =
     ]
 
 
-type alias Model =
-    { bpm : Int
-    , bpmInput : String
-    , running : Bool
-    , flash : Bool
-    , tsNum : Int -- numerator (beats per measure)
-    , tsDen : Int -- denominator (note value that gets the beat)
-    , currentBeat : Int
-    , subTick : Int -- for tracking sub-beats (for subdivisions between main beats)
-    , showHighlight : Bool -- true=highlight dot, false=show all dots neutral
-    , subdivisionIdx : Int -- index of subdivision for current signature
-    }
+
+-- INITIAL MODEL
 
 
 init : () -> ( Model, Cmd Msg )
@@ -124,14 +144,7 @@ init _ =
 
 
 
--- PORTS
-
-
-port beatClick : String -> Cmd msg
-
-
-
--- MESSAGES
+-- MESSAGES (Update actions)
 
 
 type Msg
@@ -151,6 +164,12 @@ type Msg
 -- UPDATE
 
 
+{-|
+
+    Handles all state updates and side-effects according to the received Msg.
+    Pattern logs ensure correctness and exhaustive consideration of all update scenarios.
+
+-}
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -261,19 +280,16 @@ update msg model =
                 in
                 if isEightSub then
                     if model.subTick == 0 then
-                        -- on primary (quarter note) -- advance
                         ( { model | flash = True, currentBeat = nextBeat, subTick = 1, showHighlight = True }
                         , beatClick "primary"
                         )
 
                     else
-                        -- subdivision: do not advance dot, color all default
                         ( { model | flash = True, subTick = 0, showHighlight = False }
                         , beatClick "sub"
                         )
 
                 else
-                    -- default: non-8th-sub logic (quarters, etc)
                     ( { model | flash = True, currentBeat = nextBeat }
                     , beatClick
                         (case currentSubdivision of
@@ -319,6 +335,12 @@ update msg model =
 -- SUBSCRIPTIONS
 
 
+{-|
+
+    Subscriptions for clock ticks, only active while running.
+    Interval adapts for 8th note subdivisions and time signature.
+
+-}
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.running then
@@ -342,7 +364,6 @@ subscriptions model =
                     _ ->
                         Nothing
 
-            -- By default 1, but for '8th Subdivision' in 4/4, should be 2
             mult =
                 case currentSubdivision of
                     Just sub ->
@@ -368,10 +389,14 @@ subscriptions model =
 -- VIEW
 
 
+{-|
+
+    The main view function orchestrates UI, delegating to helpers for BPM control, time signature, subdivisions, and dots.
+
+-}
 view : Model -> Html Msg
 view model =
     let
-        -- Get subdivision for the current signature
         currentSubOptions =
             List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
 
@@ -391,7 +416,6 @@ view model =
                 _ ->
                     Nothing
 
-        -- Flatten out the groups
         totalBeats =
             case currentSubdivision of
                 Just sub ->
@@ -403,105 +427,32 @@ view model =
 
                 Nothing ->
                     model.tsNum
+    in
+    div [ style "font-family" "sans-serif", style "text-align" "center", style "margin-top" "40px" ]
+        [ viewBpmControl model
+        , viewTimeSignature model
+        , viewStartStop model
+        , viewSubdivisionSelector model currentSubOptions
+        , div [ style "margin" "1.5em 0" ] (viewBeatDots model currentSubdivision totalBeats)
+        ]
 
-        -- Get group boundaries for primary beats
-        groupBoundaries =
-            case currentSubdivision of
-                Just sub ->
-                    let
-                        boundaries =
-                            List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
-                    in
-                    boundaries
 
-                Nothing ->
-                    [ 0 ]
 
-        dots =
-            let
-                isEightSub =
-                    case currentSubdivision of
-                        Just sub ->
-                            model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
+-- VIEW HELPERS
 
-                        Nothing ->
-                            False
-            in
-            List.map
-                (\i ->
-                    let
-                        isPrimary =
-                            case currentSubdivision of
-                                Just sub ->
-                                    if isEightSub then
-                                        True
-                                        -- all visible dots are primary (quarters)
 
-                                    else if sub.name == "Straight Quarters" then
-                                        i == 0
+viewBpmControl : Model -> Html Msg
+viewBpmControl model =
+    div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
+        [ span [] [ text "BPM: " ]
+        , inputSlider model.bpm
+        , inputBpmBox model
+        ]
 
-                                    else
-                                        let
-                                            boundaries =
-                                                List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
-                                        in
-                                        List.member i boundaries
 
-                                Nothing ->
-                                    i == 0
-
-                        isCurrent =
-                            (not isEightSub && (i == model.currentBeat)) || (isEightSub && i == model.currentBeat && model.showHighlight)
-
-                        bgColor =
-                            if isEightSub then
-                                if isCurrent && model.showHighlight then
-                                    "#4caf50"
-
-                                else
-                                    "#bbb"
-
-                            else if isCurrent then
-                                if isPrimary then
-                                    "#4caf50"
-
-                                else
-                                    "#2196f3"
-
-                            else if isPrimary then
-                                "#bbb"
-
-                            else
-                                "#ddd"
-
-                        borderColor =
-                            if isPrimary then
-                                "2px solid #222"
-
-                            else
-                                "1px solid #bbb"
-                    in
-                    span
-                        [ style "display" "inline-block"
-                        , style "margin" "0 .4em"
-                        , style "width" "22px"
-                        , style "height" "22px"
-                        , style "border-radius" "50%"
-                        , style "background" bgColor
-                        , style "border" borderColor
-                        , style "transition" "background 0.1s"
-                        ]
-                        []
-                )
-                (List.range 0 (totalBeats - 1))
-
-        bpmSlider =
-            div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
-                [ span [] [ text "BPM: " ]
-                , inputSlider model.bpm
-                , inputBpmBox model
-                ]
-
+viewTimeSignature : Model -> Html Msg
+viewTimeSignature model =
+    let
         timeSigList =
             [ ( 2, 4 )
             , ( 3, 4 )
@@ -522,94 +473,173 @@ view model =
             , ( 9, 16 )
             , ( 12, 16 )
             ]
-
-        timesigSelect =
-            div [ style "margin" "1em 0" ]
-                [ span [] [ text "Time Signature: " ]
-                , Html.select
-                    [ Html.Events.onInput
-                        (\str ->
-                            case String.split "/" str of
-                                [ numStr, denStr ] ->
-                                    case ( String.toInt numStr, String.toInt denStr ) of
-                                        ( Just num, Just den ) ->
-                                            SetTimeSig num den
-
-                                        _ ->
-                                            SetTimeSig model.tsNum model.tsDen
+    in
+    div [ style "margin" "1em 0" ]
+        [ span [] [ text "Time Signature: " ]
+        , Html.select
+            [ Html.Events.onInput
+                (\str ->
+                    case String.split "/" str of
+                        [ numStr, denStr ] ->
+                            case ( String.toInt numStr, String.toInt denStr ) of
+                                ( Just num, Just den ) ->
+                                    SetTimeSig num den
 
                                 _ ->
                                     SetTimeSig model.tsNum model.tsDen
-                        )
-                    ]
-                    (List.map
-                        (\( num, den ) ->
-                            let
-                                shown =
-                                    String.fromInt num ++ "/" ++ String.fromInt den
-                            in
-                            Html.option
-                                [ Html.Attributes.value shown
-                                , Html.Attributes.selected (model.tsNum == num && model.tsDen == den)
-                                ]
-                                [ text shown ]
-                        )
-                        timeSigList
-                    )
-                ]
-    in
-    div [ style "font-family" "sans-serif", style "text-align" "center", style "margin-top" "40px" ]
-        [ bpmSlider
-        , timesigSelect
-        , div [ style "margin" "2em 0" ]
-            [ button [ onClick StartStop ]
-                [ text
-                    (if model.running then
-                        "Stop"
 
-                     else
-                        "Start"
-                    )
-                ]
-            ]
-        , -- Subdivision selector UI
-          let
-            subOptions =
-                case currentSubOptions of
-                    t :: _ ->
-                        List.indexedMap Tuple.pair t.subdivisions
-
-                    _ ->
-                        []
-          in
-          if List.length subOptions > 1 then
-            div [ style "margin" "1em 0" ]
-                ([ span [] [ text "Subdivision: " ] ]
-                    ++ List.map
-                        (\( idx, sub ) ->
-                            button
-                                [ onClick (SetSubdivisionIdx idx)
-                                , style "margin" "0 .5em"
-                                , style "padding" "0.2em 0.7em"
-                                , style "background"
-                                    (if idx == model.subdivisionIdx then
-                                        "#eee"
-
-                                     else
-                                        "#fff"
-                                    )
-                                , style "border" "1px solid #666"
-                                , style "border-radius" "6px"
-                                ]
-                                [ text sub.name ]
-                        )
-                        subOptions
+                        _ ->
+                            SetTimeSig model.tsNum model.tsDen
                 )
-
-          else
-            text ""
-        , div [ style "margin" "1.5em 0" ] dots
+            ]
+            (List.map
+                (\( num, den ) ->
+                    let
+                        shown =
+                            String.fromInt num ++ "/" ++ String.fromInt den
+                    in
+                    Html.option
+                        [ Html.Attributes.value shown
+                        , Html.Attributes.selected (model.tsNum == num && model.tsDen == den)
+                        ]
+                        [ text shown ]
+                )
+                timeSigList
+            )
         ]
+
+
+viewStartStop : Model -> Html Msg
+viewStartStop model =
+    div [ style "margin" "2em 0" ]
+        [ button [ onClick StartStop ]
+            [ text
+                (if model.running then
+                    "Stop"
+
+                 else
+                    "Start"
+                )
+            ]
+        ]
+
+
+viewSubdivisionSelector : Model -> List TimeSigOptions -> Html Msg
+viewSubdivisionSelector model currentSubOptions =
+    let
+        subOptions =
+            case currentSubOptions of
+                t :: _ ->
+                    List.indexedMap Tuple.pair t.subdivisions
+
+                _ ->
+                    []
+    in
+    if List.length subOptions > 1 then
+        div [ style "margin" "1em 0" ]
+            ([ span [] [ text "Subdivision: " ] ]
+                ++ List.map
+                    (\( idx, sub ) ->
+                        button
+                            [ onClick (SetSubdivisionIdx idx)
+                            , style "margin" "0 .5em"
+                            , style "padding" "0.2em 0.7em"
+                            , style "background"
+                                (if idx == model.subdivisionIdx then
+                                    "#eee"
+
+                                 else
+                                    "#fff"
+                                )
+                            , style "border" "1px solid #666"
+                            , style "border-radius" "6px"
+                            ]
+                            [ text sub.name ]
+                    )
+                    subOptions
+            )
+
+    else
+        text ""
+
+
+viewBeatDots : Model -> Maybe Subdivision -> Int -> List (Html Msg)
+viewBeatDots model currentSubdivision totalBeats =
+    let
+        isEightSub =
+            case currentSubdivision of
+                Just sub ->
+                    model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
+
+                Nothing ->
+                    False
+    in
+    List.map
+        (\i ->
+            let
+                isPrimary =
+                    case currentSubdivision of
+                        Just sub ->
+                            if isEightSub then
+                                True
+
+                            else if sub.name == "Straight Quarters" then
+                                i == 0
+
+                            else
+                                let
+                                    boundaries =
+                                        List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
+                                in
+                                List.member i boundaries
+
+                        Nothing ->
+                            i == 0
+
+                isCurrent =
+                    (not isEightSub && (i == model.currentBeat)) || (isEightSub && i == model.currentBeat && model.showHighlight)
+
+                bgColor =
+                    if isEightSub then
+                        if isCurrent && model.showHighlight then
+                            "#4caf50"
+
+                        else
+                            "#bbb"
+
+                    else if isCurrent then
+                        if isPrimary then
+                            "#4caf50"
+
+                        else
+                            "#2196f3"
+
+                    else if isPrimary then
+                        "#bbb"
+
+                    else
+                        "#ddd"
+
+                borderColor =
+                    if isPrimary then
+                        "2px solid #222"
+
+                    else
+                        "1px solid #bbb"
+            in
+            span
+                [ style "display" "inline-block"
+                , style "margin" "0 .4em"
+                , style "width" "22px"
+                , style "height" "22px"
+                , style "border-radius" "50%"
+                , style "background" bgColor
+                , style "border" borderColor
+                , style "transition" "background 0.1s"
+                ]
+                []
+        )
+        (List.range 0 (totalBeats - 1))
 
 
 inputSlider : Int -> Html Msg
@@ -640,20 +670,7 @@ inputBpmBox model =
 
 
 
--- FLASH HANDLING
-
-
-main =
-    Browser.element
-        { init = init
-        , update = updateWithFlash
-        , subscriptions = subscriptions
-        , view = view
-        }
-
-
-
--- Reset flash after rendering
+-- FLASH HANDLING (Update wrapper to reset flash after rendering)
 
 
 updateWithFlash : Msg -> Model -> ( Model, Cmd Msg )
@@ -667,3 +684,17 @@ updateWithFlash msg model =
 
     else
         ( updatedModel, cmd )
+
+
+
+-- MAIN ENTRY
+
+
+main : Program () Model Msg
+main =
+    Browser.element
+        { init = init
+        , update = updateWithFlash
+        , subscriptions = subscriptions
+        , view = view
+        }
