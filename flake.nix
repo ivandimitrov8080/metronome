@@ -156,7 +156,7 @@
                 processes =
                   let
                     browserSync = "browser-sync start --server --files 'index.html'";
-                    watcher = "watchexec -w Main.elm -- devenv tasks run build";
+                    watcher = "watchexec -- devenv tasks run build";
                     syncElmDeps =
                       pkgs.writeScript "sync_elm_deps"
                         # bash
