@@ -34,7 +34,7 @@ allTimeSigs =
       , denominator = 4
       , subdivisions =
             [ { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
-            , { name = "8th Subdivision", groups = [ 2, 2, 2, 2 ] }
+            , { name = "8th Subdivision", groups = [ 1, 1, 1, 1, 1, 1, 1, 1 ] }
             ]
       }
     , { numerator = 3
@@ -251,11 +251,34 @@ update msg model =
 
                     -- Get if current is group boundary (primary)
                     beatType =
-                        if List.member nextBeat groupBoundaries then
-                            "primary"
+                        case currentSubdivision of
+                            Just sub ->
+                                if sub.name == "Straight Quarters" then
+                                    if nextBeat == 0 then
+                                        "primary"
 
-                        else
-                            "sub"
+                                    else
+                                        "sub"
+
+                                else if sub.name == "8th Subdivision" then
+                                    if modBy 2 nextBeat == 0 then
+                                        "primary"
+
+                                    else
+                                        "sub"
+
+                                else if List.member nextBeat groupBoundaries then
+                                    "primary"
+
+                                else
+                                    "sub"
+
+                            Nothing ->
+                                if nextBeat == 0 then
+                                    "primary"
+
+                                else
+                                    "sub"
                 in
                 ( { model | flash = True, currentBeat = nextBeat }
                 , beatClick beatType
@@ -342,7 +365,19 @@ view model =
                 (\i ->
                     let
                         isPrimary =
-                            List.member i groupBoundaries
+                            case currentSubdivision of
+                                Just sub ->
+                                    if sub.name == "Straight Quarters" then
+                                        i == 0
+
+                                    else if sub.name == "8th Subdivision" then
+                                        modBy 2 i == 0
+
+                                    else
+                                        List.member i groupBoundaries
+
+                                Nothing ->
+                                    i == 0
 
                         isCurrent =
                             i == model.currentBeat
