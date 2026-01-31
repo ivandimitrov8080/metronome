@@ -101,6 +101,7 @@ type alias Model =
     , tsDen : Int -- denominator (note value that gets the beat)
     , currentBeat : Int
     , subTick : Int -- for tracking sub-beats (for subdivisions between main beats)
+    , showHighlight : Bool -- true=highlight dot, false=show all dots neutral
     , subdivisionIdx : Int -- index of subdivision for current signature
     }
 
@@ -115,6 +116,7 @@ init _ =
       , tsDen = 4
       , currentBeat = 0
       , subTick = 0
+      , showHighlight = True
       , subdivisionIdx = 0 -- default to first option
       }
     , Cmd.none
@@ -260,13 +262,13 @@ update msg model =
                 if isEightSub then
                     if model.subTick == 0 then
                         -- on primary (quarter note) -- advance
-                        ( { model | flash = True, currentBeat = nextBeat, subTick = 1 }
+                        ( { model | flash = True, currentBeat = nextBeat, subTick = 1, showHighlight = True }
                         , beatClick "primary"
                         )
 
                     else
                         -- subdivision: do not advance dot, color all default
-                        ( { model | flash = True, subTick = 0 }
+                        ( { model | flash = True, subTick = 0, showHighlight = False }
                         , beatClick "sub"
                         )
 
@@ -449,11 +451,11 @@ view model =
                                     i == 0
 
                         isCurrent =
-                            not isEightSub && (i == model.currentBeat) || (isEightSub && i == model.currentBeat && model.subTick == 0)
+                            (not isEightSub && (i == model.currentBeat)) || (isEightSub && i == model.currentBeat && model.showHighlight)
 
                         bgColor =
                             if isEightSub then
-                                if isCurrent && model.subTick == 0 then
+                                if isCurrent && model.showHighlight then
                                     "#4caf50"
 
                                 else
