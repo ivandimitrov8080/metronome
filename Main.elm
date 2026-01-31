@@ -100,6 +100,7 @@ type alias Model =
     , tsNum : Int -- numerator (beats per measure)
     , tsDen : Int -- denominator (note value that gets the beat)
     , currentBeat : Int
+    , subTick : Int -- for tracking sub-beats (for subdivisions between main beats)
     , subdivisionIdx : Int -- index of subdivision for current signature
     }
 
@@ -113,6 +114,7 @@ init _ =
       , tsNum = 4
       , tsDen = 4
       , currentBeat = 0
+      , subTick = 0
       , subdivisionIdx = 0 -- default to first option
       }
     , Cmd.none
@@ -199,7 +201,6 @@ update msg model =
         Beat ->
             if model.running then
                 let
-                    -- get totalBeats, currentSub, groupBoundaries
                     currentSubOptions =
                         List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
 
@@ -219,28 +220,25 @@ update msg model =
                             _ ->
                                 Nothing
 
-                    groupLengths =
+                    isEightSub =
                         case currentSubdivision of
                             Just sub ->
-                                List.concatMap (\n -> List.repeat n ()) sub.groups
+                                model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
 
                             Nothing ->
-                                List.repeat model.tsNum ()
+                                False
 
                     totalBeats =
-                        List.length groupLengths
-
-                    groupBoundaries =
                         case currentSubdivision of
                             Just sub ->
-                                let
-                                    boundaries =
-                                        List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
-                                in
-                                boundaries
+                                if isEightSub then
+                                    4
+
+                                else
+                                    List.sum sub.groups
 
                             Nothing ->
-                                [ 0 ]
+                                model.tsNum
 
                     nextBeat =
                         if model.currentBeat + 1 >= totalBeats then
@@ -249,9 +247,34 @@ update msg model =
                         else
                             model.currentBeat + 1
 
-                    -- Get if current is group boundary (primary)
-                    beatType =
-                        case currentSubdivision of
+                    nextSubTick =
+                        if isEightSub then
+                            modBy 2 (model.subTick + 1)
+
+                        else
+                            0
+
+                    primaryHit =
+                        not isEightSub || model.subTick == 0
+                in
+                if isEightSub then
+                    if model.subTick == 0 then
+                        -- on primary (quarter note) -- advance
+                        ( { model | flash = True, currentBeat = nextBeat, subTick = 1 }
+                        , beatClick "primary"
+                        )
+
+                    else
+                        -- subdivision: do not advance dot, color all default
+                        ( { model | flash = True, subTick = 0 }
+                        , beatClick "sub"
+                        )
+
+                else
+                    -- default: non-8th-sub logic (quarters, etc)
+                    ( { model | flash = True, currentBeat = nextBeat }
+                    , beatClick
+                        (case currentSubdivision of
                             Just sub ->
                                 if sub.name == "Straight Quarters" then
                                     if nextBeat == 0 then
@@ -260,14 +283,15 @@ update msg model =
                                     else
                                         "sub"
 
-                                else if sub.name == "8th Subdivision" then
-                                    if modBy 2 nextBeat == 0 then
-                                        "primary"
-
-                                    else
-                                        "sub"
-
-                                else if List.member nextBeat groupBoundaries then
+                                else if
+                                    List.member nextBeat
+                                        (let
+                                            bl =
+                                                List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
+                                         in
+                                         bl
+                                        )
+                                then
                                     "primary"
 
                                 else
@@ -279,10 +303,8 @@ update msg model =
 
                                 else
                                     "sub"
-                in
-                ( { model | flash = True, currentBeat = nextBeat }
-                , beatClick beatType
-                )
+                        )
+                    )
 
             else
                 ( model, Cmd.none )
@@ -299,8 +321,40 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.running then
         let
+            currentSubOptions =
+                List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
+
+            currentSubdivision =
+                case currentSubOptions of
+                    t :: _ ->
+                        let
+                            idx =
+                                if model.subdivisionIdx < List.length t.subdivisions then
+                                    model.subdivisionIdx
+
+                                else
+                                    0
+                        in
+                        List.Extra.getAt idx t.subdivisions
+
+                    _ ->
+                        Nothing
+
+            -- By default 1, but for '8th Subdivision' in 4/4, should be 2
+            mult =
+                case currentSubdivision of
+                    Just sub ->
+                        if model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision" then
+                            2
+
+                        else
+                            1
+
+                    Nothing ->
+                        1
+
             interval =
-                60000 / toFloat model.bpm * (4 / toFloat model.tsDen)
+                60000 / toFloat model.bpm * (4 / toFloat model.tsDen) / toFloat mult
         in
         Time.every interval (\_ -> Beat)
 
@@ -336,16 +390,17 @@ view model =
                     Nothing
 
         -- Flatten out the groups
-        groupLengths =
+        totalBeats =
             case currentSubdivision of
                 Just sub ->
-                    List.concatMap (\n -> List.repeat n ()) sub.groups
+                    if model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision" then
+                        4
+
+                    else
+                        List.sum sub.groups
 
                 Nothing ->
-                    List.repeat model.tsNum ()
-
-        totalBeats =
-            List.length groupLengths
+                    model.tsNum
 
         -- Get group boundaries for primary beats
         groupBoundaries =
@@ -361,29 +416,50 @@ view model =
                     [ 0 ]
 
         dots =
+            let
+                isEightSub =
+                    case currentSubdivision of
+                        Just sub ->
+                            model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
+
+                        Nothing ->
+                            False
+            in
             List.map
                 (\i ->
                     let
                         isPrimary =
                             case currentSubdivision of
                                 Just sub ->
-                                    if sub.name == "Straight Quarters" then
+                                    if isEightSub then
+                                        True
+                                        -- all visible dots are primary (quarters)
+
+                                    else if sub.name == "Straight Quarters" then
                                         i == 0
 
-                                    else if sub.name == "8th Subdivision" then
-                                        modBy 2 i == 0
-
                                     else
-                                        List.member i groupBoundaries
+                                        let
+                                            boundaries =
+                                                List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
+                                        in
+                                        List.member i boundaries
 
                                 Nothing ->
                                     i == 0
 
                         isCurrent =
-                            i == model.currentBeat
+                            not isEightSub && (i == model.currentBeat) || (isEightSub && i == model.currentBeat && model.subTick == 0)
 
                         bgColor =
-                            if isCurrent then
+                            if isEightSub then
+                                if isCurrent && model.subTick == 0 then
+                                    "#4caf50"
+
+                                else
+                                    "#bbb"
+
+                            else if isCurrent then
                                 if isPrimary then
                                     "#4caf50"
 
