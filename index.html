@@ -8,12 +8,13 @@
 
   <body>
     <div id="myapp"></div>
-    <script src="ports.js"></script>
     <script src="elm.js"></script>
+    <script src="ports.js"></script>
     <script>
       const app = Elm.Main.init({
         node: document.getElementById("myapp"),
       });
+      window.setupPorts(app);
     </script>
   </body>
 </html>
