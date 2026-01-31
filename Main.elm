@@ -4,6 +4,8 @@ import Browser
 import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
+import Process
+import Task
 import Time
 
 
@@ -46,6 +48,7 @@ type Msg
     | StartStop
     | SetTimeSig Int Int
     | Beat
+    | AdvanceBeat
 
 
 
@@ -66,7 +69,7 @@ update msg model =
                 ( { model | running = False, flash = False, currentBeat = 0 }, Cmd.none )
 
             else
-                ( { model | running = True, currentBeat = 0 }, Cmd.none )
+                ( { model | running = True, currentBeat = -1 }, Cmd.none )
 
         SetBpm bpmVal ->
             ( { model | bpm = bpmVal }, Cmd.none )
@@ -85,7 +88,7 @@ update msg model =
                             model.currentBeat + 1
 
                     beatType =
-                        if model.currentBeat == 0 then
+                        if nextBeat == 0 then
                             "primary"
 
                         else
@@ -97,6 +100,9 @@ update msg model =
 
             else
                 ( model, Cmd.none )
+
+        AdvanceBeat ->
+            ( model, Cmd.none )
 
 
 
@@ -136,11 +142,9 @@ view model =
                             (if i == model.currentBeat then
                                 if i == 0 then
                                     "#4caf50"
-                                    -- green for primary
 
                                 else
                                     "#2196f3"
-                                -- blue for subdivisions
 
                              else
                                 "#ddd"
