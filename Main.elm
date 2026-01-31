@@ -5,6 +5,7 @@ import Browser
 import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
+import List.Extra
 import Process
 import Task
 import Time
@@ -12,6 +13,83 @@ import Time
 
 
 -- MODEL
+
+
+type alias Subdivision =
+    { name : String
+    , groups : List Int
+    }
+
+
+type alias TimeSigOptions =
+    { numerator : Int
+    , denominator : Int
+    , subdivisions : List Subdivision
+    }
+
+
+allTimeSigs : List TimeSigOptions
+allTimeSigs =
+    [ { numerator = 4
+      , denominator = 4
+      , subdivisions =
+            [ { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
+            , { name = "8th Subdivision", groups = [ 2, 2, 2, 2 ] }
+            ]
+      }
+    , { numerator = 3
+      , denominator = 4
+      , subdivisions =
+            [ { name = "Straight Quarters", groups = [ 1, 1, 1 ] }
+            , { name = "8th Subdivision", groups = [ 2, 2, 2 ] }
+            ]
+      }
+    , { numerator = 7
+      , denominator = 8
+      , subdivisions =
+            [ { name = "2+2+3", groups = [ 2, 2, 3 ] }
+            , { name = "3+2+2", groups = [ 3, 2, 2 ] }
+            , { name = "2+3+2", groups = [ 2, 3, 2 ] }
+            ]
+      }
+    , { numerator = 5
+      , denominator = 8
+      , subdivisions =
+            [ { name = "2+3", groups = [ 2, 3 ] }
+            , { name = "3+2", groups = [ 3, 2 ] }
+            ]
+      }
+    , { numerator = 6
+      , denominator = 8
+      , subdivisions =
+            [ { name = "Compound Meter (2x3)", groups = [ 3, 3 ] }
+            , { name = "Straight Eighths", groups = [ 1, 1, 1, 1, 1, 1 ] }
+            ]
+      }
+    , { numerator = 9
+      , denominator = 8
+      , subdivisions =
+            [ { name = "Compound Meter (3x3)", groups = [ 3, 3, 3 ] }
+            ]
+      }
+    , { numerator = 5
+      , denominator = 4
+      , subdivisions =
+            [ { name = "3+2", groups = [ 3, 2 ] }
+            , { name = "2+3", groups = [ 2, 3 ] }
+            , { name = "Straight Quarters", groups = [ 1, 1, 1, 1, 1 ] }
+            ]
+      }
+    , { numerator = 6
+      , denominator = 4
+      , subdivisions =
+            [ { name = "Waltz Double (3+3)", groups = [ 3, 3 ] }
+            , { name = "Straight Quarters", groups = [ 1, 1, 1, 1, 1, 1 ] }
+            ]
+      }
+
+    -- Add more as needed
+    ]
 
 
 type alias Model =
@@ -22,12 +100,21 @@ type alias Model =
     , tsNum : Int -- numerator (beats per measure)
     , tsDen : Int -- denominator (note value that gets the beat)
     , currentBeat : Int
+    , subdivisionIdx : Int -- index of subdivision for current signature
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { bpm = 120, bpmInput = "120", running = False, flash = False, tsNum = 4, tsDen = 4, currentBeat = 0 }
+    ( { bpm = 120
+      , bpmInput = "120"
+      , running = False
+      , flash = False
+      , tsNum = 4
+      , tsDen = 4
+      , currentBeat = 0
+      , subdivisionIdx = 0 -- default to first option
+      }
     , Cmd.none
     )
 
@@ -51,6 +138,7 @@ type Msg
     | SetBpmFromInput
     | StartStop
     | SetTimeSig Int Int
+    | SetSubdivisionIdx Int
     | Beat
     | AdvanceBeat
 
@@ -102,20 +190,68 @@ update msg model =
                     ( model, Cmd.none )
 
         SetTimeSig newNum newDen ->
-            ( { model | tsNum = newNum, tsDen = newDen, currentBeat = 0 }, Cmd.none )
+            -- Reset subdivisionIdx to 0 by default for new signature
+            ( { model | tsNum = newNum, tsDen = newDen, currentBeat = 0, subdivisionIdx = 0 }, Cmd.none )
+
+        SetSubdivisionIdx idx ->
+            ( { model | subdivisionIdx = idx }, Cmd.none )
 
         Beat ->
             if model.running then
                 let
+                    -- get totalBeats, currentSub, groupBoundaries
+                    currentSubOptions =
+                        List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
+
+                    currentSubdivision =
+                        case currentSubOptions of
+                            t :: _ ->
+                                let
+                                    idx =
+                                        if model.subdivisionIdx < List.length t.subdivisions then
+                                            model.subdivisionIdx
+
+                                        else
+                                            0
+                                in
+                                List.Extra.getAt idx t.subdivisions
+
+                            _ ->
+                                Nothing
+
+                    groupLengths =
+                        case currentSubdivision of
+                            Just sub ->
+                                List.concatMap (\n -> List.repeat n ()) sub.groups
+
+                            Nothing ->
+                                List.repeat model.tsNum ()
+
+                    totalBeats =
+                        List.length groupLengths
+
+                    groupBoundaries =
+                        case currentSubdivision of
+                            Just sub ->
+                                let
+                                    boundaries =
+                                        List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
+                                in
+                                boundaries
+
+                            Nothing ->
+                                [ 0 ]
+
                     nextBeat =
-                        if model.currentBeat + 1 >= model.tsNum then
+                        if model.currentBeat + 1 >= totalBeats then
                             0
 
                         else
                             model.currentBeat + 1
 
+                    -- Get if current is group boundary (primary)
                     beatType =
-                        if nextBeat == 0 then
+                        if List.member nextBeat groupBoundaries then
                             "primary"
 
                         else
@@ -156,38 +292,95 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     let
+        -- Get subdivision for the current signature
+        currentSubOptions =
+            List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
+
+        currentSubdivision =
+            case currentSubOptions of
+                t :: _ ->
+                    let
+                        idx =
+                            if model.subdivisionIdx < List.length t.subdivisions then
+                                model.subdivisionIdx
+
+                            else
+                                0
+                    in
+                    List.Extra.getAt idx t.subdivisions
+
+                _ ->
+                    Nothing
+
+        -- Flatten out the groups
+        groupLengths =
+            case currentSubdivision of
+                Just sub ->
+                    List.concatMap (\n -> List.repeat n ()) sub.groups
+
+                Nothing ->
+                    List.repeat model.tsNum ()
+
+        totalBeats =
+            List.length groupLengths
+
+        -- Get group boundaries for primary beats
+        groupBoundaries =
+            case currentSubdivision of
+                Just sub ->
+                    let
+                        boundaries =
+                            List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
+                    in
+                    boundaries
+
+                Nothing ->
+                    [ 0 ]
+
         dots =
             List.map
                 (\i ->
+                    let
+                        isPrimary =
+                            List.member i groupBoundaries
+
+                        isCurrent =
+                            i == model.currentBeat
+
+                        bgColor =
+                            if isCurrent then
+                                if isPrimary then
+                                    "#4caf50"
+
+                                else
+                                    "#2196f3"
+
+                            else if isPrimary then
+                                "#bbb"
+
+                            else
+                                "#ddd"
+
+                        borderColor =
+                            if isPrimary then
+                                "2px solid #222"
+
+                            else
+                                "1px solid #bbb"
+                    in
                     span
                         [ style "display" "inline-block"
                         , style "margin" "0 .4em"
                         , style "width" "22px"
                         , style "height" "22px"
                         , style "border-radius" "50%"
-                        , style "background"
-                            (if i == model.currentBeat then
-                                if i == 0 then
-                                    "#4caf50"
-
-                                else
-                                    "#2196f3"
-
-                             else
-                                "#ddd"
-                            )
-                        , style "border"
-                            (if i == 0 then
-                                "2px solid #222"
-
-                             else
-                                "1px solid #bbb"
-                            )
+                        , style "background" bgColor
+                        , style "border" borderColor
                         , style "transition" "background 0.1s"
                         ]
                         []
                 )
-                (List.range 0 (model.tsNum - 1))
+                (List.range 0 (totalBeats - 1))
 
         bpmSlider =
             div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
@@ -266,6 +459,42 @@ view model =
                     )
                 ]
             ]
+        , -- Subdivision selector UI
+          let
+            subOptions =
+                case currentSubOptions of
+                    t :: _ ->
+                        List.indexedMap Tuple.pair t.subdivisions
+
+                    _ ->
+                        []
+          in
+          if List.length subOptions > 1 then
+            div [ style "margin" "1em 0" ]
+                ([ span [] [ text "Subdivision: " ] ]
+                    ++ List.map
+                        (\( idx, sub ) ->
+                            button
+                                [ onClick (SetSubdivisionIdx idx)
+                                , style "margin" "0 .5em"
+                                , style "padding" "0.2em 0.7em"
+                                , style "background"
+                                    (if idx == model.subdivisionIdx then
+                                        "#eee"
+
+                                     else
+                                        "#fff"
+                                    )
+                                , style "border" "1px solid #666"
+                                , style "border-radius" "6px"
+                                ]
+                                [ text sub.name ]
+                        )
+                        subOptions
+                )
+
+          else
+            text ""
         , div [ style "margin" "1.5em 0" ] dots
         ]
 
