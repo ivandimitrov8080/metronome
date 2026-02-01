@@ -103,7 +103,7 @@
             buildPhase = ''
               runHook preBuild
 
-              runghc ./site.hs build
+              elm make src/Main.elm --output elm.js
 
               runHook postBuild
             '';
@@ -111,7 +111,9 @@
               runHook preInstall
 
               mkdir -p $out/
-              cp -r _site/* $out/
+              cp index.html $out
+              cp elm.js $out
+              cp ports.js $out
 
               runHook postInstall
             '';
@@ -180,7 +182,7 @@
                     exec = "rm -rf elm.js";
                   };
                   "build:all" = {
-                    exec = "elm make Main.elm --output elm.js";
+                    exec = "elm make src/Main.elm --output elm.js";
                   };
                 };
                 git-hooks.hooks = {
