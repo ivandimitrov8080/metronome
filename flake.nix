@@ -27,54 +27,6 @@
     let
       eachSystem = nixpkgs.lib.genAttrs (import systems);
       mkPkgs = system: import nixpkgs { inherit system; };
-      nixosModules = {
-        default =
-          {
-            system,
-            lib,
-            config,
-            ...
-          }:
-          let
-            inherit (lib) mkIf mkEnableOption;
-            cfg = config.webshite;
-            extensions = [
-              "html"
-              "txt"
-              "png"
-              "jpg"
-              "jpeg"
-            ];
-            serveStatic = exts: ''
-              try_files ${lib.strings.concatStringsSep " " (builtins.map (x: "$uri.${x}") exts)} $uri $uri/ =404;
-            '';
-            webshiteConfig = {
-              enableACME = true;
-              forceSSL = true;
-              locations = {
-                "/" = {
-                  root = "${packages.${system}.default}";
-                  extraConfig = serveStatic extensions;
-                };
-              };
-              extraConfig = ''
-                add_header 'Referrer-Policy' 'origin-when-cross-origin';
-                add_header X-Content-Type-Options nosniff;
-              '';
-            };
-          in
-          {
-            options.webshite = {
-              enable = mkEnableOption "enable webshite config";
-            };
-            config = mkIf cfg.enable {
-              services.nginx.virtualHosts = {
-                "idimitrov.dev" = webshiteConfig;
-                "www.idimitrov.dev" = webshiteConfig;
-              };
-            };
-          };
-      };
       packages = eachSystem (
         system:
         let
@@ -218,7 +170,6 @@
       inherit
         devShells
         formatter
-        nixosModules
         packages
         ;
     };
