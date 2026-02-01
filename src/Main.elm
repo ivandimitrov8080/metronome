@@ -27,6 +27,12 @@ port beatClick : String -> Cmd msg
 -- TYPES
 
 
+type alias BarConfig =
+    { barNum : Int
+    , bpm : Int
+    }
+
+
 type alias Subdivision =
     { name : String
     , groups : List Int
@@ -51,6 +57,9 @@ type alias Model =
     , subTick : Int -- for tracking sub-beats (for subdivisions between main beats)
     , showHighlight : Bool -- true=highlight dot, false=show all dots neutral
     , subdivisionIdx : Int -- index of subdivision for current signature
+    , barConfigs : List BarConfig -- list of bpm change points, always sorted, unique barNum, always bar 1
+    , activeBarNum : Int -- current bar (number, not index)
+    , sidebarError : Maybe String -- error message for sidebar barNum input
     }
 
 
@@ -134,10 +143,13 @@ init _ =
       , flash = False
       , tsNum = 4
       , tsDen = 4
-      , currentBeat = 0
+      , currentBeat = 0 -- (this is subdivision beat, not bar#)
       , subTick = 0
       , showHighlight = True
       , subdivisionIdx = 0 -- default to first option
+      , barConfigs = [ { barNum = 1, bpm = 120 } ]
+      , activeBarNum = 1 -- (current bar, default for app is bar #1)
+      , sidebarError = Nothing
       }
     , Cmd.none
     )
@@ -158,6 +170,12 @@ type Msg
     | SetSubdivisionIdx Int
     | Beat
     | AdvanceBeat
+      -- Sidebar/bar-list management:
+    | SetBarBpm Int Int -- (barIdx, bpm)
+    | SetBarNumber Int Int -- (barIdx, newBarNum)
+    | AddBar
+    | RemoveBar Int -- barIdx
+    | SetActiveBar Int -- barIdx
 
 
 
@@ -192,25 +210,16 @@ update msg model =
                 ( { model | running = False, flash = False, currentBeat = 0 }, Cmd.none )
 
             else
-                ( { model | running = True, currentBeat = -1 }, Cmd.none )
+                let
+                    firstBar =
+                        case List.minimum (List.map .barNum model.barConfigs) of
+                            Just b ->
+                                b
 
-        SetBpm bpmVal ->
-            ( { model | bpm = bpmVal, bpmInput = String.fromInt bpmVal }, Cmd.none )
-
-        SetBpmInput str ->
-            ( { model | bpmInput = str }, Cmd.none )
-
-        SetBpmFromInput ->
-            case String.toInt model.bpmInput of
-                Just v ->
-                    let
-                        clamped =
-                            clamp 30 240 v
-                    in
-                    ( { model | bpm = clamped, bpmInput = String.fromInt clamped }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
+                            Nothing ->
+                                1
+                in
+                ( { model | running = True, currentBeat = -1, activeBarNum = firstBar, bpm = bpmForBar firstBar model.barConfigs, bpmInput = String.fromInt (bpmForBar firstBar model.barConfigs) }, Cmd.none )
 
         SetTimeSig newNum newDen ->
             -- Reset subdivisionIdx to 0 by default for new signature
@@ -219,75 +228,317 @@ update msg model =
         SetSubdivisionIdx idx ->
             ( { model | subdivisionIdx = idx }, Cmd.none )
 
-        Beat ->
-            if model.running then
+        SetBarBpm idx newBpm ->
+            let
+                -- update only the bpm for the specified change point
+                barConfigsUpd =
+                    List.indexedMap
+                        (\i bar ->
+                            if i == idx then
+                                { bar | bpm = newBpm }
+
+                            else
+                                bar
+                        )
+                        model.barConfigs
+                        |> List.sortBy .barNum
+
+                bpmNow =
+                    bpmForBar model.activeBarNum barConfigsUpd
+
+                newBpmInput =
+                    String.fromInt bpmNow
+            in
+            ( { model | barConfigs = barConfigsUpd, bpm = bpmNow, bpmInput = newBpmInput }, Cmd.none )
+
+        SetBarNumber idx newNum ->
+            let
+                orig =
+                    List.Extra.getAt idx model.barConfigs
+
+                currentBarNum =
+                    case orig of
+                        Just b ->
+                            b.barNum
+
+                        _ ->
+                            1
+
+                -- Don't allow duplicate barNum except this row
+                alreadyExists =
+                    List.indexedMap Tuple.pair model.barConfigs |> List.any (\( i, b ) -> i /= idx && b.barNum == newNum)
+
+                isBar1 =
+                    currentBarNum == 1
+            in
+            if (isBar1 && newNum /= 1) || (not isBar1 && newNum == 1) || alreadyExists || newNum < 1 then
                 let
-                    currentSubOptions =
-                        List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
+                    errMsg =
+                        if newNum < 1 then
+                            Just "Bar number must be at least 1."
 
-                    currentSubdivision =
-                        case currentSubOptions of
-                            t :: _ ->
-                                let
-                                    idx =
-                                        if model.subdivisionIdx < List.length t.subdivisions then
-                                            model.subdivisionIdx
+                        else if alreadyExists then
+                            Just ("A change point for bar " ++ String.fromInt newNum ++ " already exists.")
 
-                                        else
-                                            0
-                                in
-                                List.Extra.getAt idx t.subdivisions
+                        else if isBar1 && newNum /= 1 then
+                            Just "Bar 1 cannot be changed."
 
-                            _ ->
-                                Nothing
+                        else if not isBar1 && newNum == 1 then
+                            Just "Bar 1 cannot be overwritten."
 
-                    isEightSub =
-                        case currentSubdivision of
-                            Just sub ->
-                                model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
+                        else
+                            Just "Invalid bar number."
+                in
+                ( { model | sidebarError = errMsg }, Cmd.none )
 
-                            Nothing ->
-                                False
+            else if newNum == currentBarNum then
+                ( { model | sidebarError = Nothing }, Cmd.none )
 
-                    totalBeats =
-                        case currentSubdivision of
-                            Just sub ->
-                                if isEightSub then
-                                    4
+            else
+                let
+                    updatedBars =
+                        List.indexedMap
+                            (\i bar ->
+                                if i == idx then
+                                    { bar | barNum = newNum }
 
                                 else
-                                    List.sum sub.groups
-
-                            Nothing ->
-                                model.tsNum
-
-                    nextBeat =
-                        if model.currentBeat + 1 >= totalBeats then
-                            0
-
-                        else
-                            model.currentBeat + 1
-
-                    nextSubTick =
-                        if isEightSub then
-                            modBy 2 (model.subTick + 1)
-
-                        else
-                            0
-
-                    primaryHit =
-                        not isEightSub || model.subTick == 0
+                                    bar
+                            )
+                            model.barConfigs
+                            |> List.sortBy .barNum
                 in
+                ( { model | barConfigs = updatedBars, sidebarError = Nothing }, Cmd.none )
+
+        AddBar ->
+            let
+                lastBarNum =
+                    List.maximum (List.map .barNum model.barConfigs) |> Maybe.withDefault 1
+
+                newBarNum =
+                    lastBarNum + 1
+
+                lastBpm =
+                    bpmForBar lastBarNum model.barConfigs
+
+                updatedBars =
+                    (model.barConfigs ++ [ { barNum = newBarNum, bpm = lastBpm } ])
+                        |> List.sortBy .barNum
+
+                -- After adding, make the newly added one the selected sidebar row.
+            in
+            ( { model | barConfigs = updatedBars, activeBarNum = newBarNum, bpm = lastBpm, bpmInput = String.fromInt lastBpm }, Cmd.none )
+
+        RemoveBar idx ->
+            let
+                barToRemove =
+                    List.Extra.getAt idx model.barConfigs
+
+                safeToRemove =
+                    case barToRemove of
+                        Just b ->
+                            b.barNum /= 1
+
+                        _ ->
+                            False
+
+                kept =
+                    if safeToRemove then
+                        List.Extra.indexedFoldl
+                            (\i bar acc ->
+                                if i == idx then
+                                    acc
+
+                                else
+                                    bar :: acc
+                            )
+                            []
+                            model.barConfigs
+                            |> List.reverse
+
+                    else
+                        model.barConfigs
+
+                sorted =
+                    List.sortBy .barNum kept
+
+                -- Determine correct new activeBarNum.
+                newActiveBarNum =
+                    if safeToRemove && model.activeBarNum == (barToRemove |> Maybe.map .barNum |> Maybe.withDefault 1) then
+                        if List.length sorted > 0 then
+                            List.head sorted |> Maybe.map .barNum |> Maybe.withDefault 1
+
+                        else
+                            1
+
+                    else
+                        model.activeBarNum
+
+                newBpm =
+                    bpmForBar newActiveBarNum sorted
+
+                newBpmInput =
+                    String.fromInt newBpm
+            in
+            ( { model | barConfigs = sorted, activeBarNum = newActiveBarNum, bpm = newBpm, bpmInput = newBpmInput }, Cmd.none )
+
+        SetActiveBar barNum ->
+            let
+                newBpm =
+                    bpmForBar barNum model.barConfigs
+
+                newBpmStr =
+                    String.fromInt newBpm
+            in
+            ( { model | activeBarNum = barNum, bpm = newBpm, bpmInput = newBpmStr }, Cmd.none )
+
+        Beat ->
+            let
+                currentSubOptions =
+                    List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
+
+                currentSubdivision =
+                    case currentSubOptions of
+                        t :: _ ->
+                            let
+                                idx =
+                                    if model.subdivisionIdx < List.length t.subdivisions then
+                                        model.subdivisionIdx
+
+                                    else
+                                        0
+                            in
+                            List.Extra.getAt idx t.subdivisions
+
+                        _ ->
+                            Nothing
+
+                isEightSub =
+                    case currentSubdivision of
+                        Just sub ->
+                            model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
+
+                        Nothing ->
+                            False
+
+                totalBeats =
+                    case currentSubdivision of
+                        Just sub ->
+                            if isEightSub then
+                                4
+
+                            else
+                                List.sum sub.groups
+
+                        Nothing ->
+                            model.tsNum
+
+                nextBeat =
+                    if model.currentBeat + 1 >= totalBeats then
+                        0
+
+                    else
+                        model.currentBeat + 1
+
+                nextSubTick =
+                    if isEightSub then
+                        modBy 2 (model.subTick + 1)
+
+                    else
+                        0
+
+                primaryHit =
+                    not isEightSub || model.subTick == 0
+            in
+            if model.running then
                 if isEightSub then
                     if model.subTick == 0 then
-                        ( { model | flash = True, currentBeat = nextBeat, subTick = 1, showHighlight = True }
-                        , beatClick "primary"
-                        )
+                        if nextBeat == 0 then
+                            let
+                                maxBarNum =
+                                    List.maximum (List.map .barNum model.barConfigs) |> Maybe.withDefault model.activeBarNum
+
+                                newActiveBar =
+                                    min (model.activeBarNum + 1) maxBarNum
+
+                                newBpm =
+                                    bpmForBar newActiveBar model.barConfigs
+
+                                newBpmStr =
+                                    String.fromInt newBpm
+                            in
+                            ( { model
+                                | flash = True
+                                , currentBeat = nextBeat
+                                , subTick = 1
+                                , showHighlight = True
+                                , activeBarNum = newActiveBar
+                                , bpm = newBpm
+                                , bpmInput = newBpmStr
+                              }
+                            , beatClick "primary"
+                            )
+
+                        else
+                            ( { model | flash = True, currentBeat = nextBeat, subTick = 1, showHighlight = True }
+                            , beatClick "primary"
+                            )
 
                     else
                         ( { model | flash = True, subTick = 0, showHighlight = False }
                         , beatClick "sub"
                         )
+
+                else if nextBeat == 0 then
+                    let
+                        maxBarNum =
+                            List.maximum (List.map .barNum model.barConfigs) |> Maybe.withDefault model.activeBarNum
+
+                        newActiveBar =
+                            min (model.activeBarNum + 1) maxBarNum
+
+                        newBpm =
+                            bpmForBar newActiveBar model.barConfigs
+
+                        newBpmStr =
+                            String.fromInt newBpm
+
+                        beatType =
+                            case currentSubdivision of
+                                Just sub ->
+                                    if sub.name == "Straight Quarters" then
+                                        "primary"
+
+                                    else if
+                                        List.member nextBeat
+                                            (let
+                                                bl =
+                                                    List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
+                                             in
+                                             bl
+                                            )
+                                    then
+                                        "primary"
+
+                                    else
+                                        "sub"
+
+                                Nothing ->
+                                    if nextBeat == 0 then
+                                        "primary"
+
+                                    else
+                                        "sub"
+                    in
+                    ( { model
+                        | flash = True
+                        , currentBeat = nextBeat
+                        , activeBarNum = newActiveBar
+                        , bpm = newBpm
+                        , bpmInput = newBpmStr
+                      }
+                    , beatClick beatType
+                    )
 
                 else
                     ( { model | flash = True, currentBeat = nextBeat }
@@ -316,11 +567,7 @@ update msg model =
                                     "sub"
 
                             Nothing ->
-                                if nextBeat == 0 then
-                                    "primary"
-
-                                else
-                                    "sub"
+                                "sub"
                         )
                     )
 
@@ -329,6 +576,20 @@ update msg model =
 
         AdvanceBeat ->
             ( model, Cmd.none )
+
+        SetBpm newBpm ->
+            ( { model | bpm = newBpm, bpmInput = String.fromInt newBpm }, Cmd.none )
+
+        SetBpmInput inp ->
+            ( { model | bpmInput = inp }, Cmd.none )
+
+        SetBpmFromInput ->
+            case String.toInt model.bpmInput of
+                Just bpmVal ->
+                    ( { model | bpm = bpmVal }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
 
 
@@ -428,25 +689,198 @@ view model =
                 Nothing ->
                     model.tsNum
     in
-    div [ style "font-family" "sans-serif", style "text-align" "center", style "margin-top" "40px" ]
-        [ viewBpmControl model
-        , viewTimeSignature model
-        , viewStartStop model
-        , viewSubdivisionSelector model currentSubOptions
-        , div [ style "margin" "1.5em 0" ] (viewBeatDots model currentSubdivision totalBeats)
+    div
+        [ style "font-family" "sans-serif"
+        , style "display" "flex"
+        , style "height" "100vh"
+        , style "margin" "0"
+        ]
+        [ viewSidebar model
+        , div [ style "flex-grow" "1", style "text-align" "center", style "margin-top" "40px" ]
+            [ viewBpmControl model
+            , viewTimeSignature model
+            , viewStartStop model
+            , viewSubdivisionSelector model currentSubOptions
+            , div [ style "margin" "1.5em 0" ] (viewBeatDots model currentSubdivision totalBeats)
+            ]
         ]
 
 
 
+-- BPM lookup helper for a bar number from change points
+
+
+bpmForBar : Int -> List BarConfig -> Int
+bpmForBar barNum barConfigs =
+    let
+        eligible =
+            List.filter (\bc -> bc.barNum <= barNum) barConfigs
+    in
+    case List.reverse eligible of
+        bc :: _ ->
+            bc.bpm
+
+        [] ->
+            120
+
+
+
+-- fallback, should never occur due to bar 1 always present
 -- VIEW HELPERS
+
+
+viewSidebar : Model -> Html Msg
+viewSidebar model =
+    let
+        barRow idx bar =
+            let
+                sel =
+                    bar.barNum == model.activeBarNum
+            in
+            div
+                [ style "display" "flex"
+                , style "align-items" "center"
+                , style "margin-bottom" "0.6em"
+                , style "background"
+                    (if sel then
+                        "#edf5e1"
+
+                     else
+                        "#fafafa"
+                    )
+                , style "border-radius" "6px"
+                , style "padding" "0.3em 0.5em"
+                , style "border"
+                    (if sel then
+                        "2px solid #4caf50"
+
+                     else
+                        "1px solid #ddd"
+                    )
+                ]
+                [ Html.input
+                    [ Html.Attributes.type_ "number"
+                    , Html.Attributes.min "1"
+                    , Html.Attributes.value (String.fromInt bar.barNum)
+                    , Html.Attributes.style "width" "44px"
+                    , Html.Events.onInput
+                        (\val ->
+                            case String.toInt val of
+                                Just n ->
+                                    SetBarNumber idx n
+
+                                Nothing ->
+                                    SetBarNumber idx bar.barNum
+                        )
+                    , style "margin-right" "6px"
+                    ]
+                    []
+                , span [] [ text ":" ]
+                , Html.input
+                    [ Html.Attributes.type_ "number"
+                    , Html.Attributes.min "30"
+                    , Html.Attributes.max "240"
+                    , Html.Attributes.value (String.fromInt bar.bpm)
+                    , Html.Attributes.style "width" "50px"
+                    , Html.Attributes.style "margin" "0 7px 0 7px"
+                    , Html.Events.onInput
+                        (\s ->
+                            case String.toInt s of
+                                Just v ->
+                                    SetBarBpm idx (clamp 30 240 v)
+
+                                Nothing ->
+                                    SetBarBpm idx bar.bpm
+                        )
+                    ]
+                    []
+                , button
+                    [ style "margin-left" "2px"
+                    , style "outline" "none"
+                    , style "background"
+                        (if sel then
+                            "#4caf50"
+
+                         else
+                            "#eee"
+                        )
+                    , style "color"
+                        (if sel then
+                            "#fff"
+
+                         else
+                            "#444"
+                        )
+                    , style "border-radius" "4px"
+                    , style "padding" "0.08em 0.7em"
+                    , style "border" "1px solid #aaa"
+                    , onClick (SetActiveBar bar.barNum)
+                    ]
+                    [ text
+                        (if sel then
+                            "Active"
+
+                         else
+                            "Select"
+                        )
+                    ]
+                , if List.length model.barConfigs > 1 then
+                    button
+                        [ style "margin-left" "8px"
+                        , style "background" "#ffcdd2"
+                        , style "color" "#b71c1c"
+                        , style "border-radius" "5px"
+                        , style "padding" "0.08em 0.5em"
+                        , style "border" "1px solid #c62828"
+                        , onClick (RemoveBar idx)
+                        ]
+                        [ text "Remove" ]
+
+                  else
+                    text ""
+                ]
+    in
+    div
+        [ style "width" "240px"
+        , style "padding" "28px 13px 0 13px"
+        , style "background" "#f5f5f5"
+        , style "border-right" "1px solid #ccc"
+        , style "min-height" "100vh"
+        ]
+        ([ div [ style "font-weight" "600", style "margin-bottom" "1.1em", style "font-size" "19px" ] [ text "Bars" ] ]
+            ++ (case model.sidebarError of
+                    Just msg ->
+                        [ div [ style "color" "#b71c1c", style "margin-bottom" "0.7em", style "font-size" "14px" ] [ text msg ] ]
+
+                    Nothing ->
+                        []
+               )
+            ++ List.indexedMap (\idx bar -> barRow idx bar) model.barConfigs
+            ++ [ button
+                    [ style "margin-top" "0.7em"
+                    , style "background" "#2196f3"
+                    , style "color" "#fff"
+                    , style "border-radius" "7px"
+                    , style "padding" "0.23em 1.4em"
+                    , style "border" "1px solid #1565c0"
+                    , style "font-size" "15px"
+                    , onClick AddBar
+                    ]
+                    [ text "+ Add Bar" ]
+               ]
+        )
 
 
 viewBpmControl : Model -> Html Msg
 viewBpmControl model =
+    let
+        bpmValue =
+            bpmForBar model.activeBarNum model.barConfigs
+    in
     div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
         [ span [] [ text "BPM: " ]
-        , inputSlider model.bpm
-        , inputBpmBox model
+        , inputSlider bpmValue
+        , inputBpmBox bpmValue model
         ]
 
 
@@ -654,13 +1088,13 @@ inputSlider bpmVal =
         []
 
 
-inputBpmBox : Model -> Html Msg
-inputBpmBox model =
+inputBpmBox : Int -> Model -> Html Msg
+inputBpmBox bpmValue model =
     Html.input
         [ Html.Attributes.type_ "number"
         , Html.Attributes.min "30"
         , Html.Attributes.max "240"
-        , Html.Attributes.value model.bpmInput
+        , Html.Attributes.value (String.fromInt bpmValue)
         , Html.Attributes.style "width" "60px"
         , Html.Attributes.style "margin-left" "10px"
         , Html.Events.onInput SetBpmInput
