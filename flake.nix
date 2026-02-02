@@ -98,6 +98,7 @@
                   elmPackages.elm
                   elmPackages.elm-format
                   elmPackages.elm-json
+                  elmPackages.elm-test
                   elm2nix
                   (nixvim.web.extend {
                     lsp.servers = {
@@ -135,6 +136,12 @@
                   };
                   "build:all" = {
                     exec = "elm make src/Main.elm --output elm.js";
+                  };
+                  "lint:all" = {
+                    exec = "elm-review";
+                  };
+                  "test:all" = {
+                    exec = "elm-test";
                   };
                 };
                 git-hooks.hooks = {

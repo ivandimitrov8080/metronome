@@ -5,6 +5,11 @@
     version = "8.7.0";
   };
 
+  "elm-explorations/test" = {
+    sha256 = "15ayrylxancgjbdnmb0x7297vx86mn7206mdzihbf1yr4g6hlq3i";
+    version = "2.2.1";
+  };
+
   "elm/browser" = {
     sha256 = "0nagb9ajacxbbg985r4k9h0jadqpp0gp84nm94kcgbr5sf8i9x13";
     version = "1.0.2";
@@ -25,9 +30,19 @@
     version = "1.0.0";
   };
 
+  "elm/bytes" = {
+    sha256 = "02ywbf52akvxclpxwj9n04jydajcbsbcbsnjs53yjc5lwck3abwj";
+    version = "1.0.8";
+  };
+
   "elm/json" = {
     sha256 = "0w1n61m2b9zbwp1yx8zhvir7gqy66mkm22rpq8hmnvgkcwnhxalb";
     version = "1.1.4";
+  };
+
+  "elm/random" = {
+    sha256 = "138n2455wdjwa657w6sjq18wx2r0k60ibpc4frhbqr50sncxrfdl";
+    version = "1.0.0";
   };
 
   "elm/url" = {
