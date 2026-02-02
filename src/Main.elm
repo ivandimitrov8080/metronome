@@ -9,14 +9,11 @@ This module implements a customizable metronome app, supporting various time sig
 
 -}
 
-import Basics exposing (clamp)
 import Browser
 import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import List.Extra
-import Process
-import Task
 import Time
 
 
@@ -160,16 +157,13 @@ init _ =
 
 
 type Msg
-    = IncrementBpm
-    | DecrementBpm
-    | SetBpm Int
+    = SetBpm Int
     | SetBpmInput String
     | SetBpmFromInput
     | StartStop
     | SetTimeSig Int Int
     | SetSubdivisionIdx Int
     | Beat
-    | AdvanceBeat
       -- Sidebar/bar-list management:
     | SetBarBpm Int Int -- (barIdx, bpm)
     | SetBarNumber Int Int -- (barIdx, newBarNum)
@@ -191,20 +185,6 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        IncrementBpm ->
-            let
-                newBpm =
-                    model.bpm + 1
-            in
-            ( { model | bpm = newBpm, bpmInput = String.fromInt newBpm }, Cmd.none )
-
-        DecrementBpm ->
-            let
-                newBpm =
-                    max 20 (model.bpm - 1)
-            in
-            ( { model | bpm = newBpm, bpmInput = String.fromInt newBpm }, Cmd.none )
-
         StartStop ->
             if model.running then
                 ( { model | running = False, flash = False, currentBeat = 0 }, Cmd.none )
@@ -365,7 +345,7 @@ update msg model =
                 -- Determine correct new activeBarNum.
                 newActiveBarNum =
                     if safeToRemove && model.activeBarNum == (barToRemove |> Maybe.map .barNum |> Maybe.withDefault 1) then
-                        if List.length sorted > 0 then
+                        if not (List.isEmpty sorted) then
                             List.head sorted |> Maybe.map .barNum |> Maybe.withDefault 1
 
                         else
@@ -393,64 +373,54 @@ update msg model =
             ( { model | activeBarNum = barNum, bpm = newBpm, bpmInput = newBpmStr }, Cmd.none )
 
         Beat ->
-            let
-                currentSubOptions =
-                    List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
-
-                currentSubdivision =
-                    case currentSubOptions of
-                        t :: _ ->
-                            let
-                                idx =
-                                    if model.subdivisionIdx < List.length t.subdivisions then
-                                        model.subdivisionIdx
-
-                                    else
-                                        0
-                            in
-                            List.Extra.getAt idx t.subdivisions
-
-                        _ ->
-                            Nothing
-
-                isEightSub =
-                    case currentSubdivision of
-                        Just sub ->
-                            model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
-
-                        Nothing ->
-                            False
-
-                totalBeats =
-                    case currentSubdivision of
-                        Just sub ->
-                            if isEightSub then
-                                4
-
-                            else
-                                List.sum sub.groups
-
-                        Nothing ->
-                            model.tsNum
-
-                nextBeat =
-                    if model.currentBeat + 1 >= totalBeats then
-                        0
-
-                    else
-                        model.currentBeat + 1
-
-                nextSubTick =
-                    if isEightSub then
-                        modBy 2 (model.subTick + 1)
-
-                    else
-                        0
-
-                primaryHit =
-                    not isEightSub || model.subTick == 0
-            in
             if model.running then
+                let
+                    currentSubOptions =
+                        List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
+
+                    currentSubdivision =
+                        case currentSubOptions of
+                            t :: _ ->
+                                let
+                                    idx =
+                                        if model.subdivisionIdx < List.length t.subdivisions then
+                                            model.subdivisionIdx
+
+                                        else
+                                            0
+                                in
+                                List.Extra.getAt idx t.subdivisions
+
+                            _ ->
+                                Nothing
+
+                    isEightSub =
+                        case currentSubdivision of
+                            Just sub ->
+                                model.tsNum == 4 && model.tsDen == 4 && sub.name == "8th Subdivision"
+
+                            Nothing ->
+                                False
+
+                    totalBeats =
+                        case currentSubdivision of
+                            Just sub ->
+                                if isEightSub then
+                                    4
+
+                                else
+                                    List.sum sub.groups
+
+                            Nothing ->
+                                model.tsNum
+
+                    nextBeat =
+                        if model.currentBeat + 1 >= totalBeats then
+                            0
+
+                        else
+                            model.currentBeat + 1
+                in
                 if isEightSub then
                     if model.subTick == 0 then
                         if nextBeat == 0 then
@@ -511,12 +481,7 @@ update msg model =
 
                                     else if
                                         List.member nextBeat
-                                            (let
-                                                bl =
-                                                    List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
-                                             in
-                                             bl
-                                            )
+                                            (List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse)
                                     then
                                         "primary"
 
@@ -524,11 +489,7 @@ update msg model =
                                         "sub"
 
                                 Nothing ->
-                                    if nextBeat == 0 then
-                                        "primary"
-
-                                    else
-                                        "sub"
+                                    "primary"
                     in
                     ( { model
                         | flash = True
@@ -546,20 +507,11 @@ update msg model =
                         (case currentSubdivision of
                             Just sub ->
                                 if sub.name == "Straight Quarters" then
-                                    if nextBeat == 0 then
-                                        "primary"
-
-                                    else
-                                        "sub"
+                                    "sub"
 
                                 else if
                                     List.member nextBeat
-                                        (let
-                                            bl =
-                                                List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
-                                         in
-                                         bl
-                                        )
+                                        (List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse)
                                 then
                                     "primary"
 
@@ -573,9 +525,6 @@ update msg model =
 
             else
                 ( model, Cmd.none )
-
-        AdvanceBeat ->
-            ( model, Cmd.none )
 
         SetBpm newBpm ->
             ( { model | bpm = newBpm, bpmInput = String.fromInt newBpm }, Cmd.none )
@@ -847,8 +796,8 @@ viewSidebar model =
         , style "border-right" "1px solid #ccc"
         , style "min-height" "100vh"
         ]
-        ([ div [ style "font-weight" "600", style "margin-bottom" "1.1em", style "font-size" "19px" ] [ text "Bars" ] ]
-            ++ (case model.sidebarError of
+        (div [ style "font-weight" "600", style "margin-bottom" "1.1em", style "font-size" "19px" ] [ text "Bars" ]
+            :: (case model.sidebarError of
                     Just msg ->
                         [ div [ style "color" "#b71c1c", style "margin-bottom" "0.7em", style "font-size" "14px" ] [ text msg ] ]
 
@@ -880,7 +829,7 @@ viewBpmControl model =
     div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
         [ span [] [ text "BPM: " ]
         , inputSlider bpmValue
-        , inputBpmBox bpmValue model
+        , inputBpmBox bpmValue
         ]
 
 
@@ -971,8 +920,8 @@ viewSubdivisionSelector model currentSubOptions =
     in
     if List.length subOptions > 1 then
         div [ style "margin" "1em 0" ]
-            ([ span [] [ text "Subdivision: " ] ]
-                ++ List.map
+            (span [] [ text "Subdivision: " ]
+                :: List.map
                     (\( idx, sub ) ->
                         button
                             [ onClick (SetSubdivisionIdx idx)
@@ -1088,8 +1037,8 @@ inputSlider bpmVal =
         []
 
 
-inputBpmBox : Int -> Model -> Html Msg
-inputBpmBox bpmValue model =
+inputBpmBox : Int -> Html Msg
+inputBpmBox bpmValue =
     Html.input
         [ Html.Attributes.type_ "number"
         , Html.Attributes.min "30"
