@@ -143,6 +143,7 @@
                   elm-format.enable = true;
                   deadnix.enable = true;
                   statix.enable = true;
+                  elm-review.enable = true;
                 };
               }
             ];
