@@ -55,7 +55,7 @@
             buildPhase = ''
               runHook preBuild
 
-              elm make src/Main.elm --output elm.js
+              elm make src/Main.elm --output elm.js --optimize
 
               runHook postBuild
             '';
