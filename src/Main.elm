@@ -191,6 +191,7 @@ update msg model =
 
             else
                 let
+                    firstBar : Int
                     firstBar =
                         case List.minimum (List.map .barNum model.barConfigs) of
                             Just b ->
@@ -211,6 +212,7 @@ update msg model =
         SetBarBpm idx newBpm ->
             let
                 -- update only the bpm for the specified change point
+                barConfigsUpd : List BarConfig
                 barConfigsUpd =
                     List.indexedMap
                         (\i bar ->
@@ -223,9 +225,11 @@ update msg model =
                         model.barConfigs
                         |> List.sortBy .barNum
 
+                bpmNow : Int
                 bpmNow =
                     bpmForBar model.activeBarNum barConfigsUpd
 
+                newBpmInput : String
                 newBpmInput =
                     String.fromInt bpmNow
             in
@@ -233,9 +237,11 @@ update msg model =
 
         SetBarNumber idx newNum ->
             let
+                orig : Maybe BarConfig
                 orig =
                     List.Extra.getAt idx model.barConfigs
 
+                currentBarNum : Int
                 currentBarNum =
                     case orig of
                         Just b ->
@@ -245,14 +251,17 @@ update msg model =
                             1
 
                 -- Don't allow duplicate barNum except this row
+                alreadyExists : Bool
                 alreadyExists =
                     List.indexedMap Tuple.pair model.barConfigs |> List.any (\( i, b ) -> i /= idx && b.barNum == newNum)
 
+                isBar1 : Bool
                 isBar1 =
                     currentBarNum == 1
             in
             if (isBar1 && newNum /= 1) || (not isBar1 && newNum == 1) || alreadyExists || newNum < 1 then
                 let
+                    errMsg : Maybe String
                     errMsg =
                         if newNum < 1 then
                             Just "Bar number must be at least 1."
@@ -276,6 +285,7 @@ update msg model =
 
             else
                 let
+                    updatedBars : List BarConfig
                     updatedBars =
                         List.indexedMap
                             (\i bar ->
@@ -292,15 +302,19 @@ update msg model =
 
         AddBar ->
             let
+                lastBarNum : Int
                 lastBarNum =
                     List.maximum (List.map .barNum model.barConfigs) |> Maybe.withDefault 1
 
+                newBarNum : Int
                 newBarNum =
                     lastBarNum + 1
 
+                lastBpm : Int
                 lastBpm =
                     bpmForBar lastBarNum model.barConfigs
 
+                updatedBars : List { bpm : Int, barNum : Int }
                 updatedBars =
                     (model.barConfigs ++ [ { barNum = newBarNum, bpm = lastBpm } ])
                         |> List.sortBy .barNum
@@ -311,9 +325,11 @@ update msg model =
 
         RemoveBar idx ->
             let
+                barToRemove : Maybe BarConfig
                 barToRemove =
                     List.Extra.getAt idx model.barConfigs
 
+                safeToRemove : Bool
                 safeToRemove =
                     case barToRemove of
                         Just b ->
@@ -322,6 +338,7 @@ update msg model =
                         _ ->
                             False
 
+                kept : List BarConfig
                 kept =
                     if safeToRemove then
                         List.Extra.indexedFoldl
@@ -339,10 +356,12 @@ update msg model =
                     else
                         model.barConfigs
 
+                sorted : List BarConfig
                 sorted =
                     List.sortBy .barNum kept
 
                 -- Determine correct new activeBarNum.
+                newActiveBarNum : Int
                 newActiveBarNum =
                     if safeToRemove && model.activeBarNum == (barToRemove |> Maybe.map .barNum |> Maybe.withDefault 1) then
                         if not (List.isEmpty sorted) then
@@ -354,9 +373,11 @@ update msg model =
                     else
                         model.activeBarNum
 
+                newBpm : Int
                 newBpm =
                     bpmForBar newActiveBarNum sorted
 
+                newBpmInput : String
                 newBpmInput =
                     String.fromInt newBpm
             in
@@ -364,9 +385,11 @@ update msg model =
 
         SetActiveBar barNum ->
             let
+                newBpm : Int
                 newBpm =
                     bpmForBar barNum model.barConfigs
 
+                newBpmStr : String
                 newBpmStr =
                     String.fromInt newBpm
             in
@@ -375,13 +398,16 @@ update msg model =
         Beat ->
             if model.running then
                 let
+                    currentSubOptions : List { subdivisions : List Subdivision, numerator : Int, denominator : Int }
                     currentSubOptions =
                         List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
 
+                    currentSubdivision : Maybe Subdivision
                     currentSubdivision =
                         case currentSubOptions of
                             t :: _ ->
                                 let
+                                    idx : Int
                                     idx =
                                         if model.subdivisionIdx < List.length t.subdivisions then
                                             model.subdivisionIdx
@@ -394,6 +420,7 @@ update msg model =
                             _ ->
                                 Nothing
 
+                    isEightSub : Bool
                     isEightSub =
                         case currentSubdivision of
                             Just sub ->
@@ -402,6 +429,7 @@ update msg model =
                             Nothing ->
                                 False
 
+                    totalBeats : Int
                     totalBeats =
                         case currentSubdivision of
                             Just sub ->
@@ -414,6 +442,7 @@ update msg model =
                             Nothing ->
                                 model.tsNum
 
+                    nextBeat : Int
                     nextBeat =
                         if model.currentBeat + 1 >= totalBeats then
                             0
@@ -425,15 +454,19 @@ update msg model =
                     if model.subTick == 0 then
                         if nextBeat == 0 then
                             let
+                                maxBarNum : Int
                                 maxBarNum =
                                     List.maximum (List.map .barNum model.barConfigs) |> Maybe.withDefault model.activeBarNum
 
+                                newActiveBar : Int
                                 newActiveBar =
                                     min (model.activeBarNum + 1) maxBarNum
 
+                                newBpm : Int
                                 newBpm =
                                     bpmForBar newActiveBar model.barConfigs
 
+                                newBpmStr : String
                                 newBpmStr =
                                     String.fromInt newBpm
                             in
@@ -461,18 +494,23 @@ update msg model =
 
                 else if nextBeat == 0 then
                     let
+                        maxBarNum : Int
                         maxBarNum =
                             List.maximum (List.map .barNum model.barConfigs) |> Maybe.withDefault model.activeBarNum
 
+                        newActiveBar : Int
                         newActiveBar =
                             min (model.activeBarNum + 1) maxBarNum
 
+                        newBpm : Int
                         newBpm =
                             bpmForBar newActiveBar model.barConfigs
 
+                        newBpmStr : String
                         newBpmStr =
                             String.fromInt newBpm
 
+                        beatType : String
                         beatType =
                             case currentSubdivision of
                                 Just sub ->
@@ -555,13 +593,16 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.running then
         let
+            currentSubOptions : List { subdivisions : List Subdivision, numerator : Int, denominator : Int }
             currentSubOptions =
                 List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
 
+            currentSubdivision : Maybe Subdivision
             currentSubdivision =
                 case currentSubOptions of
                     t :: _ ->
                         let
+                            idx : Int
                             idx =
                                 if model.subdivisionIdx < List.length t.subdivisions then
                                     model.subdivisionIdx
@@ -574,6 +615,7 @@ subscriptions model =
                     _ ->
                         Nothing
 
+            mult : Int
             mult =
                 case currentSubdivision of
                     Just sub ->
@@ -586,6 +628,7 @@ subscriptions model =
                     Nothing ->
                         1
 
+            interval : Float
             interval =
                 60000 / toFloat model.bpm * (4 / toFloat model.tsDen) / toFloat mult
         in
@@ -607,13 +650,16 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     let
+        currentSubOptions : List { subdivisions : List Subdivision, numerator : Int, denominator : Int }
         currentSubOptions =
             List.filter (\ts -> ts.numerator == model.tsNum && ts.denominator == model.tsDen) allTimeSigs
 
+        currentSubdivision : Maybe Subdivision
         currentSubdivision =
             case currentSubOptions of
                 t :: _ ->
                     let
+                        idx : Int
                         idx =
                             if model.subdivisionIdx < List.length t.subdivisions then
                                 model.subdivisionIdx
@@ -626,6 +672,7 @@ view model =
                 _ ->
                     Nothing
 
+        totalBeats : Int
         totalBeats =
             case currentSubdivision of
                 Just sub ->
@@ -662,6 +709,7 @@ view model =
 bpmForBar : Int -> List BarConfig -> Int
 bpmForBar barNum barConfigs =
     let
+        eligible : List { bpm : Int, barNum : Int }
         eligible =
             List.filter (\bc -> bc.barNum <= barNum) barConfigs
     in
@@ -681,8 +729,10 @@ bpmForBar barNum barConfigs =
 viewSidebar : Model -> Html Msg
 viewSidebar model =
     let
+        barRow : Int -> { barNum : Int, bpm : Int } -> Html Msg
         barRow idx bar =
             let
+                sel : Bool
                 sel =
                     bar.barNum == model.activeBarNum
             in
@@ -823,6 +873,7 @@ viewSidebar model =
 viewBpmControl : Model -> Html Msg
 viewBpmControl model =
     let
+        bpmValue : Int
         bpmValue =
             bpmForBar model.activeBarNum model.barConfigs
     in
@@ -836,6 +887,7 @@ viewBpmControl model =
 viewTimeSignature : Model -> Html Msg
 viewTimeSignature model =
     let
+        timeSigList : List ( Int, Int )
         timeSigList =
             [ ( 2, 4 )
             , ( 3, 4 )
@@ -878,6 +930,7 @@ viewTimeSignature model =
             (List.map
                 (\( num, den ) ->
                     let
+                        shown : String
                         shown =
                             String.fromInt num ++ "/" ++ String.fromInt den
                     in
@@ -910,6 +963,7 @@ viewStartStop model =
 viewSubdivisionSelector : Model -> List TimeSigOptions -> Html Msg
 viewSubdivisionSelector model currentSubOptions =
     let
+        subOptions : List ( Int, Subdivision )
         subOptions =
             case currentSubOptions of
                 t :: _ ->
@@ -949,6 +1003,7 @@ viewSubdivisionSelector model currentSubOptions =
 viewBeatDots : Model -> Maybe Subdivision -> Int -> List (Html Msg)
 viewBeatDots model currentSubdivision totalBeats =
     let
+        isEightSub : Bool
         isEightSub =
             case currentSubdivision of
                 Just sub ->
@@ -960,6 +1015,7 @@ viewBeatDots model currentSubdivision totalBeats =
     List.map
         (\i ->
             let
+                isPrimary : Bool
                 isPrimary =
                     case currentSubdivision of
                         Just sub ->
@@ -971,6 +1027,7 @@ viewBeatDots model currentSubdivision totalBeats =
 
                             else
                                 let
+                                    boundaries : List Int
                                     boundaries =
                                         List.foldl (\n ( acc, idx ) -> ( idx :: acc, idx + n )) ( [], 0 ) sub.groups |> Tuple.first |> List.reverse
                                 in
@@ -979,9 +1036,11 @@ viewBeatDots model currentSubdivision totalBeats =
                         Nothing ->
                             i == 0
 
+                isCurrent : Bool
                 isCurrent =
                     (not isEightSub && (i == model.currentBeat)) || (isEightSub && i == model.currentBeat && model.showHighlight)
 
+                bgColor : String
                 bgColor =
                     if isEightSub then
                         if isCurrent && model.showHighlight then
@@ -1003,6 +1062,7 @@ viewBeatDots model currentSubdivision totalBeats =
                     else
                         "#ddd"
 
+                borderColor : String
                 borderColor =
                     if isPrimary then
                         "2px solid #222"
