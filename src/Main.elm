@@ -180,13 +180,13 @@ viewStartStop : Model -> Html Msg
 viewStartStop model =
     div [ style "margin" "2em 0" ]
         [ if model.metronome.active then
-            button [ onClick Start ]
+            button [ onClick Stop ]
                 [ text
                     "Stop"
                 ]
 
           else
-            button [ onClick Stop ]
+            button [ onClick Start ]
                 [ text
                     "Start"
                 ]
