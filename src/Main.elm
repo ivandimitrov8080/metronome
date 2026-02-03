@@ -2,8 +2,10 @@ port module Main exposing (main)
 
 import Browser
 import Html exposing (Html, button, div, span, text)
-import Html.Attributes exposing (style)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (placeholder, style, type_, value)
+import Html.Events exposing (onClick, onInput)
+import List exposing (sortBy)
+import List.Extra exposing (find, updateIf)
 import Time
 
 
@@ -114,7 +116,7 @@ initMetronome =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { metronome = initMetronome
-      , barConfig = [ { bar = 0, metronome = initMetronome } ]
+      , barConfig = [ { bar = 1, metronome = initMetronome } ]
       }
     , Cmd.none
     )
@@ -126,6 +128,10 @@ type Msg
     | Stop
     | SetTimeSignature TimeSignature
     | Beat
+    | AddBarConfig
+    | SetBarConfigBar Int Int
+    | SetBarConfigBpm Int Float
+    | SetBarConfigTimeSignature Int TimeSignature
 
 
 start : Metronome -> Metronome
@@ -190,6 +196,86 @@ setTimeSignature metronome timeSignature =
     { metronome | timeSignature = timeSignature }
 
 
+findBarConfigByBarNumber : List BarConfig -> Int -> BarConfig
+findBarConfigByBarNumber barConfig bar =
+    case find (\e -> e.bar == bar) barConfig of
+        Just bc ->
+            bc
+
+        Nothing ->
+            { bar = 0, metronome = initMetronome }
+
+
+lastElem : List a -> Maybe a
+lastElem =
+    List.foldl (Just >> always) Nothing
+
+
+addBarConfig : Model -> Model
+addBarConfig model =
+    let
+        lastBar : Int
+        lastBar =
+            case lastElem model.barConfig of
+                Just c ->
+                    c.bar
+
+                Nothing ->
+                    0
+
+        bc : List BarConfig
+        bc =
+            List.append model.barConfig [ { bar = lastBar + 1, metronome = initMetronome } ]
+    in
+    { model | barConfig = sortBy (\c -> c.bar) bc }
+
+
+setBarConfigBar : Model -> Int -> Int -> Model
+setBarConfigBar model bar newBar =
+    let
+        bc : List BarConfig
+        bc =
+            updateIf (\b -> b.bar == bar) (\b -> { b | bar = newBar }) model.barConfig
+    in
+    { model | barConfig = bc }
+
+
+setBarConfigBpm : Model -> Int -> Float -> Model
+setBarConfigBpm model bar bpm =
+    let
+        metronome : Metronome
+        metronome =
+            (findBarConfigByBarNumber model.barConfig bar).metronome
+
+        newMetronome : Metronome
+        newMetronome =
+            { metronome | bpm = bpm }
+
+        bc : List BarConfig
+        bc =
+            updateIf (\b -> b.bar == bar) (\b -> { b | metronome = newMetronome }) model.barConfig
+    in
+    { model | barConfig = bc }
+
+
+setBarConfigTimeSignature : Model -> Int -> TimeSignature -> Model
+setBarConfigTimeSignature model bar timeSignature =
+    let
+        metronome : Metronome
+        metronome =
+            (findBarConfigByBarNumber model.barConfig bar).metronome
+
+        newMetronome : Metronome
+        newMetronome =
+            { metronome | timeSignature = timeSignature }
+
+        bc : List BarConfig
+        bc =
+            updateIf (\b -> b.bar == bar) (\b -> { b | metronome = newMetronome }) model.barConfig
+    in
+    { model | barConfig = bc }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -207,6 +293,18 @@ update msg model =
 
         SetTimeSignature timeSignature ->
             ( { model | metronome = setTimeSignature model.metronome timeSignature }, Cmd.none )
+
+        AddBarConfig ->
+            ( addBarConfig model, Cmd.none )
+
+        SetBarConfigBar idx bpm ->
+            ( setBarConfigBar model idx bpm, Cmd.none )
+
+        SetBarConfigBpm idx bpm ->
+            ( setBarConfigBpm model idx bpm, Cmd.none )
+
+        SetBarConfigTimeSignature idx bpm ->
+            ( setBarConfigTimeSignature model idx bpm, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -279,7 +377,8 @@ view model =
         , style "height" "100vh"
         , style "margin" "0"
         ]
-        [ div [ style "flex-grow" "1", style "text-align" "center", style "margin-top" "40px" ]
+        [ viewSidebar model
+        , div [ style "flex-grow" "1", style "text-align" "center", style "margin-top" "40px" ]
             [ viewBpmControl model
             , viewStartStop model
             , viewBeatDots model
@@ -329,6 +428,87 @@ viewStartStop model =
                 [ text
                     "Start"
                 ]
+        ]
+
+
+viewSidebarBarCard : BarConfig -> Html Msg
+viewSidebarBarCard barConfig =
+    div
+        [ style "background" "#fff"
+        , style "border" "1px solid #ddd"
+        , style "border-radius" "10px"
+        , style "box-shadow" "0 1px 6px rgba(0,0,0,0.05)"
+        , style "margin-bottom" "18px"
+        , style "padding" "18px 14px 14px 14px"
+        ]
+        [ div [ style "font-weight" "bold", style "font-size" "16px", style "margin-bottom" "14px" ] [ text "Bar #", text (String.fromInt barConfig.bar) ]
+        , div [ style "margin-bottom" "14px" ]
+            [ text "Bar number"
+            , Html.input
+                [ type_ "number"
+                , value (String.fromInt barConfig.bar)
+                , Html.Attributes.min "1"
+                , placeholder "Bar number"
+                , onInput (String.toInt >> Maybe.withDefault barConfig.bar >> SetBarConfigBar barConfig.bar)
+                ]
+                []
+            ]
+        , div [ style "margin-bottom" "14px" ]
+            [ text "BPM"
+            , Html.input
+                [ type_ "number"
+                , value (String.fromFloat barConfig.metronome.bpm)
+                , Html.Attributes.min "30"
+                , Html.Attributes.max "240"
+                , placeholder "BPM"
+                , onInput (String.toFloat >> Maybe.withDefault barConfig.metronome.bpm >> SetBarConfigBpm barConfig.bar)
+                ]
+                []
+            ]
+        , div [ style "margin-bottom" "14px" ]
+            [ text "Time signature"
+            , Html.select
+                [ value (timeSignatureToString barConfig.metronome.timeSignature)
+                , onInput
+                    (stringToTimeSignature
+                        >> Maybe.withDefault barConfig.metronome.timeSignature
+                        >> SetBarConfigTimeSignature barConfig.bar
+                    )
+                ]
+                (List.map
+                    (\ts ->
+                        Html.option [ Html.Attributes.value (timeSignatureToString ts) ] [ text (timeSignatureToString ts) ]
+                    )
+                    allTimeSignatures
+                )
+            ]
+        ]
+
+
+viewSidebar : Model -> Html Msg
+viewSidebar model =
+    div
+        [ style "width" "320px"
+        , style "background" "#f7f7f7"
+        , style "border-right" "1px solid #ccc"
+        , style "padding" "32px 22px 22px 22px"
+        , style "box-sizing" "border-box"
+        , style "height" "100vh"
+        , style "overflow-y" "auto"
+        ]
+        [ div [ style "margin-bottom" "28px", style "font-size" "22px", style "font-weight" "bold", style "letter-spacing" "1px" ] [ text "Bar Configs" ]
+        , div [] (List.map viewSidebarBarCard model.barConfig)
+        , button
+            [ style "margin-top" "9px"
+            , style "width" "100%"
+            , style "padding" "10px 0"
+            , style "background" "#eef"
+            , style "border" "1px solid #ccd"
+            , style "font-size" "15px"
+            , style "border-radius" "8px"
+            , onClick AddBarConfig
+            ]
+            [ text "+ Add Bar" ]
         ]
 
 
