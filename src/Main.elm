@@ -56,8 +56,8 @@ type alias Model =
 --     ]
 
 
-allTimeSigs : List TimeSignature
-allTimeSigs =
+allTimeSignatures : List TimeSignature
+allTimeSignatures =
     [ ( 4, 4 )
     , ( 3, 4 )
     , ( 7, 8 )
@@ -67,6 +67,26 @@ allTimeSigs =
     , ( 5, 4 )
     , ( 6, 4 )
     ]
+
+
+timeSignatureToString : TimeSignature -> String
+timeSignatureToString ( num, den ) =
+    String.fromInt num ++ "/" ++ String.fromInt den
+
+
+stringToTimeSignature : String -> Maybe TimeSignature
+stringToTimeSignature str =
+    case String.split "/" str of
+        [ numStr, denStr ] ->
+            case ( String.toInt numStr, String.toInt denStr ) of
+                ( Just num, Just den ) ->
+                    Just ( num, den )
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
 
 
 init : () -> ( Model, Cmd Msg )
@@ -179,6 +199,19 @@ viewBpmControl model =
             , Html.Events.onInput (String.toFloat >> Maybe.withDefault model.metronome.bpm >> SetBpm)
             ]
             []
+        , Html.select
+            [ Html.Attributes.value (timeSignatureToString model.metronome.timeSignature)
+            , Html.Events.onInput (stringToTimeSignature >> Maybe.withDefault model.metronome.timeSignature >> SetTimeSignature)
+            ]
+            (List.map
+                (\ts ->
+                    Html.option
+                        [ Html.Attributes.value (timeSignatureToString ts)
+                        ]
+                        [ text (timeSignatureToString ts) ]
+                )
+                allTimeSignatures
+            )
         ]
 
 
