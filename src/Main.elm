@@ -119,6 +119,11 @@ start metronome =
     { metronome | active = True }
 
 
+stop : Metronome -> Metronome
+stop metronome =
+    { metronome | active = False, currentBeat = 0 }
+
+
 beat : Model -> ( Model, Cmd Msg )
 beat model =
     let
@@ -170,7 +175,7 @@ update msg model =
             ( { model | metronome = start model.metronome }, Cmd.none )
 
         Stop ->
-            init ()
+            ( { model | metronome = stop model.metronome }, Cmd.none )
 
         Beat ->
             beat model
