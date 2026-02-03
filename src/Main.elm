@@ -17,6 +17,7 @@ type alias Metronome =
     , active : Bool
     , currentBeat : Int
     , remainder : Int
+    , currentBar : Int
     }
 
 
@@ -100,6 +101,7 @@ init _ =
             , active = False
             , currentBeat = 0
             , remainder = 0
+            , currentBar = 0
             }
       }
     , Cmd.none
@@ -121,7 +123,7 @@ start metronome =
 
 stop : Metronome -> Metronome
 stop metronome =
-    { metronome | active = False, currentBeat = 0 }
+    { metronome | active = False, currentBeat = 0, currentBar = 0 }
 
 
 beat : Model -> ( Model, Cmd Msg )
@@ -151,9 +153,17 @@ beat model =
         previousBeat =
             model.metronome.currentBeat
 
+        newBar : Int
+        newBar =
+            if remainder == 0 then
+                model.metronome.currentBar + 1
+
+            else
+                model.metronome.currentBar
+
         newMetronome : Metronome
         newMetronome =
-            { metronome | currentBeat = previousBeat + 1, remainder = remainder }
+            { metronome | currentBeat = previousBeat + 1, remainder = remainder, currentBar = newBar }
     in
     ( { model | metronome = newMetronome }, beatClick beatType )
 
