@@ -31,8 +31,15 @@ type alias TimeSignature =
     ( Int, Int )
 
 
+type alias BarConfig =
+    { bar : Int
+    , metronome : Metronome
+    }
+
+
 type alias Model =
     { metronome : Metronome
+    , barConfig : List BarConfig
     }
 
 
@@ -92,17 +99,22 @@ stringToTimeSignature str =
             Nothing
 
 
+initMetronome : Metronome
+initMetronome =
+    { bpm = 120
+    , timeSignature = ( 4, 4 )
+    , subdivision = { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
+    , active = False
+    , currentBeat = 0
+    , remainder = 0
+    , currentBar = 0
+    }
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { metronome =
-            { bpm = 120
-            , timeSignature = ( 4, 4 )
-            , subdivision = { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
-            , active = False
-            , currentBeat = 0
-            , remainder = 0
-            , currentBar = 0
-            }
+    ( { metronome = initMetronome
+      , barConfig = [ { bar = 0, metronome = initMetronome } ]
       }
     , Cmd.none
     )
