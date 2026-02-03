@@ -1,7 +1,7 @@
 port module Main exposing (main)
 
 import Browser
-import Html exposing (Html, button, div, select, span, text)
+import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Time
@@ -15,6 +15,7 @@ type alias Metronome =
     , timeSignature : TimeSignature
     , subdivision : Subdivision
     , active : Bool
+    , currentBeat : Int
     }
 
 
@@ -96,6 +97,7 @@ init _ =
             , timeSignature = ( 4, 4 )
             , subdivision = { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
             , active = False
+            , currentBeat = 0
             }
       }
     , Cmd.none
@@ -120,9 +122,34 @@ stop metronome =
     { metronome | active = False }
 
 
-beat : Cmd Msg
-beat =
-    beatClick "primary"
+beat : Model -> ( Model, Cmd Msg )
+beat model =
+    let
+        num : Int
+        num =
+            Tuple.first model.metronome.timeSignature
+
+        beatType : String
+        beatType =
+            if remainderBy num model.metronome.currentBeat == 0 then
+                "primary"
+
+            else
+                ""
+
+        metronome : Metronome
+        metronome =
+            model.metronome
+
+        previousBeat : Int
+        previousBeat =
+            model.metronome.currentBeat
+
+        newMetronome : Metronome
+        newMetronome =
+            { metronome | currentBeat = previousBeat + 1 }
+    in
+    ( { model | metronome = newMetronome }, beatClick beatType )
 
 
 setBpm : Metronome -> Float -> Metronome
@@ -145,7 +172,7 @@ update msg model =
             ( { model | metronome = stop model.metronome }, Cmd.none )
 
         Beat ->
-            ( model, beat )
+            beat model
 
         SetBpm newBpm ->
             ( { model | metronome = setBpm model.metronome newBpm }, Cmd.none )

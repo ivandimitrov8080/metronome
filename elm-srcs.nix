@@ -1,10 +1,5 @@
 {
 
-  "elm-community/list-extra" = {
-    sha256 = "02grd0p5hc2gvdy4n723d1s28pm1grn95jrzic6jcgb26qh16vcc";
-    version = "8.7.0";
-  };
-
   "elm/browser" = {
     sha256 = "0nagb9ajacxbbg985r4k9h0jadqpp0gp84nm94kcgbr5sf8i9x13";
     version = "1.0.2";
