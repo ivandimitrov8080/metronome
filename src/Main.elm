@@ -16,6 +16,7 @@ type alias Metronome =
     , subdivision : Subdivision
     , active : Bool
     , currentBeat : Int
+    , remainder : Int
     }
 
 
@@ -98,6 +99,7 @@ init _ =
             , subdivision = { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
             , active = False
             , currentBeat = 0
+            , remainder = 0
             }
       }
     , Cmd.none
@@ -117,11 +119,6 @@ start metronome =
     { metronome | active = True }
 
 
-stop : Metronome -> Metronome
-stop metronome =
-    { metronome | active = False }
-
-
 beat : Model -> ( Model, Cmd Msg )
 beat model =
     let
@@ -129,9 +126,13 @@ beat model =
         num =
             Tuple.first model.metronome.timeSignature
 
+        remainder : Int
+        remainder =
+            remainderBy num model.metronome.currentBeat
+
         beatType : String
         beatType =
-            if remainderBy num model.metronome.currentBeat == 0 then
+            if remainder == 0 then
                 "primary"
 
             else
@@ -147,7 +148,7 @@ beat model =
 
         newMetronome : Metronome
         newMetronome =
-            { metronome | currentBeat = previousBeat + 1 }
+            { metronome | currentBeat = previousBeat + 1, remainder = remainder }
     in
     ( { model | metronome = newMetronome }, beatClick beatType )
 
@@ -169,7 +170,7 @@ update msg model =
             ( { model | metronome = start model.metronome }, Cmd.none )
 
         Stop ->
-            ( { model | metronome = stop model.metronome }, Cmd.none )
+            init ()
 
         Beat ->
             beat model
@@ -199,6 +200,50 @@ subscriptions model =
         Sub.none
 
 
+
+-- VIEW BEAT DOTS --
+
+
+viewBeatDots : Model -> Html Msg
+viewBeatDots model =
+    let
+        dots : List (Html Msg)
+        dots =
+            List.range 0 (Tuple.first model.metronome.timeSignature - 1)
+                |> List.map
+                    (\i ->
+                        let
+                            isCurrent : Bool
+                            isCurrent =
+                                model.metronome.remainder == i
+
+                            color : String
+                            color =
+                                if isCurrent then
+                                    if i == 0 then
+                                        "yellow"
+
+                                    else
+                                        "blue"
+
+                                else
+                                    "#ccc"
+                        in
+                        span
+                            [ style "display" "inline-block"
+                            , style "width" "24px"
+                            , style "height" "24px"
+                            , style "border-radius" "50%"
+                            , style "margin" "6px"
+                            , style "background" color
+                            , style "border" "2px solid #888"
+                            ]
+                            []
+                    )
+    in
+    div [ style "display" "flex", style "justify-content" "center", style "margin" "32px 0" ] dots
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -210,6 +255,7 @@ view model =
         [ div [ style "flex-grow" "1", style "text-align" "center", style "margin-top" "40px" ]
             [ viewBpmControl model
             , viewStartStop model
+            , viewBeatDots model
             ]
         ]
 
