@@ -1,7 +1,7 @@
 port module Main exposing (main)
 
 import Browser
-import Html exposing (Html, button, div, span, text)
+import Html exposing (Html, button, div, select, span, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Time
@@ -12,6 +12,7 @@ port beatClick : String -> Cmd msg
 
 type alias Metronome =
     { bpm : Float
+    , timeSignature : TimeSignature
     , subdivision : Subdivision
     , active : Bool
     }
@@ -23,15 +24,56 @@ type alias Subdivision =
     }
 
 
+type alias TimeSignature =
+    ( Int, Int )
+
+
 type alias Model =
     { metronome : Metronome
     }
+
+
+
+-- allSubdivisions : List Subdivision
+-- allSubdivisions =
+--     [ { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
+--     , { name = "8th Subdivision", groups = [ 1, 1, 1, 1, 1, 1, 1, 1 ] }
+--     , { name = "Straight Quarters", groups = [ 1, 1, 1 ] }
+--     , { name = "8th Subdivision", groups = [ 2, 2, 2 ] }
+--     , { name = "2+2+3", groups = [ 2, 2, 3 ] }
+--     , { name = "3+2+2", groups = [ 3, 2, 2 ] }
+--     , { name = "2+3+2", groups = [ 2, 3, 2 ] }
+--     , { name = "2+3", groups = [ 2, 3 ] }
+--     , { name = "3+2", groups = [ 3, 2 ] }
+--     , { name = "Compound Meter (2x3)", groups = [ 3, 3 ] }
+--     , { name = "Straight Eighths", groups = [ 1, 1, 1, 1, 1, 1 ] }
+--     , { name = "Compound Meter (3x3)", groups = [ 3, 3, 3 ] }
+--     , { name = "3+2", groups = [ 3, 2 ] }
+--     , { name = "2+3", groups = [ 2, 3 ] }
+--     , { name = "Straight Quarters", groups = [ 1, 1, 1, 1, 1 ] }
+--     , { name = "Waltz Double (3+3)", groups = [ 3, 3 ] }
+--     , { name = "Straight Quarters", groups = [ 1, 1, 1, 1, 1, 1 ] }
+--     ]
+
+
+allTimeSigs : List TimeSignature
+allTimeSigs =
+    [ ( 4, 4 )
+    , ( 3, 4 )
+    , ( 7, 8 )
+    , ( 5, 8 )
+    , ( 6, 8 )
+    , ( 9, 8 )
+    , ( 5, 4 )
+    , ( 6, 4 )
+    ]
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { metronome =
             { bpm = 120
+            , timeSignature = ( 4, 4 )
             , subdivision = { name = "Straight Quarters", groups = [ 1, 1, 1, 1 ] }
             , active = False
             }
@@ -44,6 +86,7 @@ type Msg
     = SetBpm Float
     | Start
     | Stop
+    | SetTimeSignature TimeSignature
     | Beat
 
 
@@ -67,6 +110,11 @@ setBpm metronome bpm =
     { metronome | bpm = bpm }
 
 
+setTimeSignature : Metronome -> TimeSignature -> Metronome
+setTimeSignature metronome timeSignature =
+    { metronome | timeSignature = timeSignature }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -81,6 +129,9 @@ update msg model =
 
         SetBpm newBpm ->
             ( { model | metronome = setBpm model.metronome newBpm }, Cmd.none )
+
+        SetTimeSignature timeSignature ->
+            ( { model | metronome = setTimeSignature model.metronome timeSignature }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -120,7 +171,14 @@ viewBpmControl : Model -> Html Msg
 viewBpmControl model =
     div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
         [ span [] [ text ("BPM: " ++ String.fromFloat model.metronome.bpm) ]
-        , inputSlider model.metronome.bpm
+        , Html.input
+            [ Html.Attributes.type_ "range"
+            , Html.Attributes.min "30"
+            , Html.Attributes.max "240"
+            , Html.Attributes.value (String.fromFloat model.metronome.bpm)
+            , Html.Events.onInput (String.toFloat >> Maybe.withDefault model.metronome.bpm >> SetBpm)
+            ]
+            []
         ]
 
 
@@ -139,18 +197,6 @@ viewStartStop model =
                     "Start"
                 ]
         ]
-
-
-inputSlider : Float -> Html Msg
-inputSlider bpmVal =
-    Html.input
-        [ Html.Attributes.type_ "range"
-        , Html.Attributes.min "30"
-        , Html.Attributes.max "240"
-        , Html.Attributes.value (String.fromFloat bpmVal)
-        , Html.Events.onInput (String.toFloat >> Maybe.withDefault bpmVal >> SetBpm)
-        ]
-        []
 
 
 main : Program () Model Msg
