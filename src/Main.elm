@@ -2,7 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Html exposing (Html, button, div, span, text)
-import Html.Attributes exposing (placeholder, style, type_, value)
+import Html.Attributes exposing (disabled, placeholder, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import List exposing (filter, sortBy)
 import List.Extra exposing (takeWhile, updateIf)
@@ -455,11 +455,12 @@ viewBpmControl model =
     div [ style "display" "flex", style "align-items" "center", style "justify-content" "center", style "gap" "22px", style "margin-bottom" "20px" ]
         [ span [ style "font-weight" "bold", style "font-size" "18px", style "color" "#245" ] [ text ("BPM: " ++ String.fromFloat model.metronome.bpm) ]
         , Html.input
-            [ Html.Attributes.type_ "range"
+            [ type_ "range"
             , Html.Attributes.min "30"
             , Html.Attributes.max "240"
-            , Html.Attributes.value (String.fromFloat model.metronome.bpm)
-            , Html.Events.onInput (String.toFloat >> Maybe.withDefault model.metronome.bpm >> SetBpm)
+            , value (String.fromFloat model.metronome.bpm)
+            , onInput (String.toFloat >> Maybe.withDefault model.metronome.bpm >> SetBpm)
+            , disabled model.barConfigsEnabled
             , style "accent-color" "#3a58ed"
             , style "width" "135px"
             , style "height" "6px"
@@ -469,6 +470,7 @@ viewBpmControl model =
             []
         , Html.select
             [ Html.Attributes.value (timeSignatureToString model.metronome.timeSignature)
+            , disabled model.barConfigsEnabled
             , style "padding" "8px 20px 8px 10px"
             , style "border-radius" "9px"
             , style "border" "1.5px solid #d2d7e9"
