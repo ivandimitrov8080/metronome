@@ -457,26 +457,35 @@ viewStartStop model =
 viewSidebarBarCard : BarConfig -> Html Msg
 viewSidebarBarCard barConfig =
     div
-        [ style "background" "#fff"
-        , style "border" "1px solid #ddd"
-        , style "border-radius" "10px"
-        , style "box-shadow" "0 1px 6px rgba(0,0,0,0.05)"
-        , style "margin-bottom" "18px"
-        , style "padding" "18px 14px 14px 14px"
+        [ style "background" "linear-gradient(135deg,#fcfcff 65%,#e9efff 100%)"
+        , style "border" "1px solid #e1e7f0"
+        , style "border-radius" "18px"
+        , style "box-shadow" "0 6px 24px -4px rgba(44,50,120,0.12), 0 1.5px 6px 0 rgba(80,110,185,0.08)"
+        , style "transition" "box-shadow .2s"
+        , style "margin-bottom" "24px"
+        , style "padding" "24px 18px 20px 18px"
+        , style "position" "relative"
         ]
-        [ div [ style "font-weight" "bold", style "font-size" "16px", style "margin-bottom" "14px" ] [ text "Bar #", text (String.fromInt barConfig.bar) ]
-        , div [ style "margin-bottom" "14px" ]
+        [ div [ style "margin-bottom" "14px" ]
             [ text "Bar number"
             , Html.input
                 [ type_ "number"
                 , value (String.fromInt barConfig.bar)
                 , Html.Attributes.min "1"
                 , placeholder "Bar number"
+                , style "margin-left" "14px"
+                , style "padding" "7px 12px"
+                , style "border-radius" "9px"
+                , style "border" "1.5px solid #d2d7e9"
+                , style "background" "#f5f8ff"
+                , style "font-size" "15px"
+                , style "outline" "none"
+                , style "transition" "border-color .2s"
                 , onInput (String.toInt >> Maybe.withDefault barConfig.bar >> SetBarConfigBar barConfig.bar)
                 ]
                 []
             ]
-        , div [ style "margin-bottom" "14px" ]
+        , div [ style "margin-bottom" "14px", style "border-top" "1px solid #e8eaf2", style "padding-top" "16px", style "margin-top" "8px" ]
             [ text "BPM"
             , Html.input
                 [ type_ "number"
@@ -484,14 +493,30 @@ viewSidebarBarCard barConfig =
                 , Html.Attributes.min "30"
                 , Html.Attributes.max "240"
                 , placeholder "BPM"
+                , style "margin-left" "14px"
+                , style "padding" "7px 12px"
+                , style "border-radius" "9px"
+                , style "border" "1.5px solid #d2d7e9"
+                , style "background" "#f5f8ff"
+                , style "font-size" "15px"
+                , style "outline" "none"
+                , style "transition" "border-color .2s"
                 , onInput (String.toFloat >> Maybe.withDefault barConfig.metronome.bpm >> SetBarConfigBpm barConfig.bar)
                 ]
                 []
             ]
-        , div [ style "margin-bottom" "14px" ]
+        , div [ style "margin-bottom" "14px", style "border-top" "1px solid #e8eaf2", style "padding-top" "16px", style "margin-top" "8px" ]
             [ text "Time signature"
             , Html.select
                 [ value (timeSignatureToString barConfig.metronome.timeSignature)
+                , style "margin-left" "14px"
+                , style "padding" "7px 12px"
+                , style "border-radius" "9px"
+                , style "border" "1.5px solid #d2d7e9"
+                , style "background" "#f5f8ff"
+                , style "font-size" "15px"
+                , style "outline" "none"
+                , style "transition" "border-color .2s"
                 , onInput
                     (stringToTimeSignature
                         >> Maybe.withDefault barConfig.metronome.timeSignature
