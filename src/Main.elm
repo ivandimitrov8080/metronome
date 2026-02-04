@@ -5,7 +5,7 @@ import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (placeholder, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import List exposing (filter, sortBy)
-import List.Extra exposing (find, updateIf)
+import List.Extra exposing (takeWhile, updateIf)
 import Time
 
 
@@ -81,6 +81,11 @@ allTimeSignatures =
     ]
 
 
+lastElem : List a -> Maybe a
+lastElem =
+    List.foldl (Just >> always) Nothing
+
+
 timeSignatureToString : TimeSignature -> String
 timeSignatureToString ( num, den ) =
     String.fromInt num ++ "/" ++ String.fromInt den
@@ -101,6 +106,16 @@ stringToTimeSignature str =
             Nothing
 
 
+findBarConfigMetronome : Int -> List BarConfig -> Metronome
+findBarConfigMetronome bar barConfig =
+    case barConfig |> takeWhile (\c -> c.bar <= bar) |> lastElem of
+        Just bc ->
+            bc.metronome
+
+        Nothing ->
+            initMetronome
+
+
 initMetronome : Metronome
 initMetronome =
     { bpm = 120
@@ -113,10 +128,15 @@ initMetronome =
     }
 
 
+initActiveMetronome : Metronome
+initActiveMetronome =
+    { initMetronome | active = True }
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { metronome = initMetronome
-      , barConfig = [ { bar = 1, metronome = initMetronome } ]
+      , barConfig = [ { bar = 1, metronome = initActiveMetronome } ]
       }
     , Cmd.none
     )
@@ -163,10 +183,6 @@ beat model =
             else
                 ""
 
-        metronome : Metronome
-        metronome =
-            model.metronome
-
         previousBeat : Int
         previousBeat =
             model.metronome.currentBeat
@@ -178,6 +194,10 @@ beat model =
 
             else
                 model.metronome.currentBar
+
+        metronome : Metronome
+        metronome =
+            findBarConfigMetronome newBar model.barConfig
 
         newMetronome : Metronome
         newMetronome =
@@ -196,21 +216,6 @@ setTimeSignature metronome timeSignature =
     { metronome | timeSignature = timeSignature }
 
 
-findBarConfigByBarNumber : List BarConfig -> Int -> BarConfig
-findBarConfigByBarNumber barConfig bar =
-    case find (\e -> e.bar == bar) barConfig of
-        Just bc ->
-            bc
-
-        Nothing ->
-            { bar = 0, metronome = initMetronome }
-
-
-lastElem : List a -> Maybe a
-lastElem =
-    List.foldl (Just >> always) Nothing
-
-
 addBarConfig : Model -> Model
 addBarConfig model =
     let
@@ -225,7 +230,7 @@ addBarConfig model =
 
         bc : List BarConfig
         bc =
-            List.append model.barConfig [ { bar = lastBar + 1, metronome = initMetronome } ]
+            List.append model.barConfig [ { bar = lastBar + 1, metronome = initActiveMetronome } ]
     in
     { model | barConfig = sortBy (\c -> c.bar) bc }
 
@@ -254,7 +259,7 @@ setBarConfigBpm model bar bpm =
     let
         metronome : Metronome
         metronome =
-            (findBarConfigByBarNumber model.barConfig bar).metronome
+            findBarConfigMetronome bar model.barConfig
 
         newMetronome : Metronome
         newMetronome =
@@ -272,7 +277,7 @@ setBarConfigTimeSignature model bar timeSignature =
     let
         metronome : Metronome
         metronome =
-            (findBarConfigByBarNumber model.barConfig bar).metronome
+            findBarConfigMetronome bar model.barConfig
 
         newMetronome : Metronome
         newMetronome =
