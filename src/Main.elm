@@ -42,6 +42,7 @@ type alias BarConfig =
 type alias Model =
     { metronome : Metronome
     , barConfig : List BarConfig
+    , barConfigsEnabled : Bool
     }
 
 
@@ -137,6 +138,7 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { metronome = initMetronome
       , barConfig = [ { bar = 1, metronome = initActiveMetronome } ]
+      , barConfigsEnabled = False
       }
     , Cmd.none
     )
@@ -152,6 +154,7 @@ type Msg
     | SetBarConfigBar Int Int
     | SetBarConfigBpm Int Float
     | SetBarConfigTimeSignature Int TimeSignature
+    | SetBarConfigsEnabled Bool
 
 
 start : Metronome -> Metronome
@@ -193,7 +196,11 @@ beat model =
 
         metronome : Metronome
         metronome =
-            findBarConfigMetronome newBar model.barConfig
+            if model.barConfigsEnabled then
+                findBarConfigMetronome newBar model.barConfig
+
+            else
+                model.metronome
 
         newCurrentBeat : Int
         newCurrentBeat =
@@ -320,6 +327,9 @@ update msg model =
 
         SetBarConfigTimeSignature idx bpm ->
             ( setBarConfigTimeSignature model idx bpm, Cmd.none )
+
+        SetBarConfigsEnabled enabled ->
+            ( { model | barConfigsEnabled = enabled }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -609,8 +619,21 @@ viewSidebar model =
         , style "height" "100vh"
         , style "overflow-y" "auto"
         ]
-        [ div [ style "margin-bottom" "28px", style "font-size" "22px", style "font-weight" "bold", style "letter-spacing" "1px" ] [ text "Bar Configs" ]
-        , div [] (List.map viewSidebarBarCard model.barConfig)
+        [ div [ style "display" "flex", style "align-items" "center", style "margin-bottom" "16px" ]
+            [ Html.input
+                [ Html.Attributes.type_ "checkbox"
+                , Html.Attributes.checked model.barConfigsEnabled
+                , Html.Events.onInput (\v -> SetBarConfigsEnabled (v == "on"))
+                , style "margin-right" "12px"
+                , style "width" "18px"
+                , style "height" "18px"
+                ]
+                []
+            , span [ style "font-weight" "bold", style "font-size" "16px", style "color" "#293477" ] [ text "Enable bar configs" ]
+            ]
+        , div [ style "margin-bottom" "28px", style "font-size" "22px", style "font-weight" "bold", style "letter-spacing" "1px" ] [ text "Bar Configs" ]
+        , div []
+            (List.map viewSidebarBarCard model.barConfig)
         , button
             [ style "margin-top" "9px"
             , style "width" "100%"
