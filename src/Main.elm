@@ -623,7 +623,7 @@ viewSidebar model =
             [ Html.input
                 [ Html.Attributes.type_ "checkbox"
                 , Html.Attributes.checked model.barConfigsEnabled
-                , Html.Events.onInput (\v -> SetBarConfigsEnabled (v == "on"))
+                , Html.Events.onCheck SetBarConfigsEnabled
                 , style "margin-right" "12px"
                 , style "width" "18px"
                 , style "height" "18px"
