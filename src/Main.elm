@@ -4,7 +4,7 @@ import Browser
 import Html exposing (Html, button, div, span, text)
 import Html.Attributes exposing (placeholder, style, type_, value)
 import Html.Events exposing (onClick, onInput)
-import List exposing (sortBy)
+import List exposing (filter, sortBy)
 import List.Extra exposing (find, updateIf)
 import Time
 
@@ -233,11 +233,20 @@ addBarConfig model =
 setBarConfigBar : Model -> Int -> Int -> Model
 setBarConfigBar model bar newBar =
     let
-        bc : List BarConfig
-        bc =
-            updateIf (\b -> b.bar == bar) (\b -> { b | bar = newBar }) model.barConfig
+        bars : List BarConfig
+        bars =
+            filter (\e -> e.bar == newBar) model.barConfig
     in
-    { model | barConfig = bc }
+    if not (List.isEmpty bars) then
+        model
+
+    else
+        let
+            bc : List BarConfig
+            bc =
+                updateIf (\b -> b.bar == bar) (\b -> { b | bar = newBar }) model.barConfig
+        in
+        { model | barConfig = bc }
 
 
 setBarConfigBpm : Model -> Int -> Float -> Model
