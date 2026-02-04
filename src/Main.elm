@@ -369,27 +369,52 @@ viewBeatDots model =
                             color =
                                 if isCurrent then
                                     if i == 0 then
-                                        "yellow"
+                                        "#ffe369"
 
                                     else
-                                        "blue"
+                                        "#7ec1fa"
 
                                 else
-                                    "#ccc"
+                                    "#d8e1fa"
+
+                            borderCol : String
+                            borderCol =
+                                if isCurrent then
+                                    "#3561f6"
+
+                                else
+                                    "#b9c8e8"
+
+                            shadow : String
+                            shadow =
+                                if isCurrent then
+                                    "0 0 0 6px rgba(54,97,246,0.10)"
+
+                                else
+                                    "none"
+
+                            size : String
+                            size =
+                                if isCurrent then
+                                    "32px"
+
+                                else
+                                    "22px"
                         in
                         span
                             [ style "display" "inline-block"
-                            , style "width" "24px"
-                            , style "height" "24px"
+                            , style "width" size
+                            , style "height" size
                             , style "border-radius" "50%"
-                            , style "margin" "6px"
                             , style "background" color
-                            , style "border" "2px solid #888"
+                            , style "border" ("2.5px solid " ++ borderCol)
+                            , style "box-shadow" shadow
+                            , style "transition" "all .18s"
                             ]
                             []
                     )
     in
-    div [ style "display" "flex", style "justify-content" "center", style "margin" "32px 0" ] dots
+    div [ style "display" "flex", style "justify-content" "center", style "margin" "30px 0 12px 0", style "gap" "7px" ] dots
 
 
 view : Model -> Html Msg
@@ -401,28 +426,54 @@ view model =
         , style "margin" "0"
         ]
         [ viewSidebar model
-        , div [ style "flex-grow" "1", style "text-align" "center", style "margin-top" "40px" ]
-            [ viewBpmControl model
-            , viewStartStop model
-            , viewBeatDots model
+        , div [ style "flex-grow" "1", style "display" "flex", style "flex-direction" "column", style "align-items" "center", style "justify-content" "center", style "height" "100vh" ]
+            [ div
+                [ style "background" "linear-gradient(135deg,#f9fafd 65%,#e5edff 100%)"
+                , style "border" "1px solid #e1e7f0"
+                , style "border-radius" "20px"
+                , style "box-shadow" "0 8px 32px -8px rgba(44,50,120,0.13), 0 1.5px 8px 0 rgba(80,110,185,0.09)"
+                , style "padding" "36px 34px 34px 34px"
+                , style "width" "420px"
+                , style "max-width" "90vw"
+                , style "display" "flex"
+                , style "flex-direction" "column"
+                , style "align-items" "center"
+                , style "margin-top" "0"
+                ]
+                [ viewBpmControl model
+                , viewStartStop model
+                , viewBeatDots model
+                ]
             ]
         ]
 
 
 viewBpmControl : Model -> Html Msg
 viewBpmControl model =
-    div [ style "display" "flex", style "align-items" "center", style "justify-content" "center" ]
-        [ span [] [ text ("BPM: " ++ String.fromFloat model.metronome.bpm) ]
+    div [ style "display" "flex", style "align-items" "center", style "justify-content" "center", style "gap" "22px", style "margin-bottom" "20px" ]
+        [ span [ style "font-weight" "bold", style "font-size" "18px", style "color" "#245" ] [ text ("BPM: " ++ String.fromFloat model.metronome.bpm) ]
         , Html.input
             [ Html.Attributes.type_ "range"
             , Html.Attributes.min "30"
             , Html.Attributes.max "240"
             , Html.Attributes.value (String.fromFloat model.metronome.bpm)
             , Html.Events.onInput (String.toFloat >> Maybe.withDefault model.metronome.bpm >> SetBpm)
+            , style "accent-color" "#3a58ed"
+            , style "width" "135px"
+            , style "height" "6px"
+            , style "background" "linear-gradient(90deg,#dae3ff 30%,#a6c3ff 100%)"
+            , style "border-radius" "8px"
             ]
             []
         , Html.select
             [ Html.Attributes.value (timeSignatureToString model.metronome.timeSignature)
+            , style "padding" "8px 20px 8px 10px"
+            , style "border-radius" "9px"
+            , style "border" "1.5px solid #d2d7e9"
+            , style "background" "#f5f8ff"
+            , style "font-size" "16px"
+            , style "outline" "none"
+            , style "transition" "border-color .2s"
             , Html.Events.onInput (stringToTimeSignature >> Maybe.withDefault model.metronome.timeSignature >> SetTimeSignature)
             ]
             (List.map
@@ -439,18 +490,40 @@ viewBpmControl model =
 
 viewStartStop : Model -> Html Msg
 viewStartStop model =
-    div [ style "margin" "2em 0" ]
+    div [ style "margin" "16px 0 24px 0", style "display" "flex", style "justify-content" "center" ]
         [ if model.metronome.active then
-            button [ onClick Stop ]
-                [ text
-                    "Stop"
+            button
+                [ onClick Stop
+                , style "background" "linear-gradient(90deg,#fb7171 20%,#ffb8b8 95%)"
+                , style "color" "white"
+                , style "border" "none"
+                , style "border-radius" "10px"
+                , style "box-shadow" "0 2px 12px 0 rgba(240,80,80,0.17)"
+                , style "padding" "12px 38px"
+                , style "font-size" "17px"
+                , style "font-weight" "bold"
+                , style "letter-spacing" ".5px"
+                , style "transition" "filter .15s"
+                , style "cursor" "pointer"
                 ]
+                [ text "Stop" ]
 
           else
-            button [ onClick Start ]
-                [ text
-                    "Start"
+            button
+                [ onClick Start
+                , style "background" "linear-gradient(90deg,#5a7efe 15%,#6de9fb 95%)"
+                , style "color" "white"
+                , style "border" "none"
+                , style "border-radius" "10px"
+                , style "box-shadow" "0 2px 12px 0 rgba(64,90,240,0.13)"
+                , style "padding" "12px 38px"
+                , style "font-size" "17px"
+                , style "font-weight" "bold"
+                , style "letter-spacing" ".5px"
+                , style "transition" "filter .15s"
+                , style "cursor" "pointer"
                 ]
+                [ text "Start" ]
         ]
 
 
