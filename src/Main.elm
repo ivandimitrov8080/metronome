@@ -270,13 +270,9 @@ setBarConfigBpm model bar bpm =
         metronome =
             findBarConfigMetronome bar model.barConfig
 
-        newMetronome : Metronome
-        newMetronome =
-            { metronome | bpm = bpm }
-
         bc : List BarConfig
         bc =
-            updateIf (\b -> b.bar == bar) (\b -> { b | metronome = newMetronome }) model.barConfig
+            updateIf (\b -> b.bar == bar) (\b -> { b | metronome = setBpm metronome bpm }) model.barConfig
     in
     { model | barConfig = bc }
 
@@ -288,13 +284,9 @@ setBarConfigTimeSignature model bar timeSignature =
         metronome =
             findBarConfigMetronome bar model.barConfig
 
-        newMetronome : Metronome
-        newMetronome =
-            { metronome | timeSignature = timeSignature }
-
         bc : List BarConfig
         bc =
-            updateIf (\b -> b.bar == bar) (\b -> { b | metronome = newMetronome }) model.barConfig
+            updateIf (\b -> b.bar == bar) (\b -> { b | metronome = setTimeSignature metronome timeSignature }) model.barConfig
     in
     { model | barConfig = bc }
 
