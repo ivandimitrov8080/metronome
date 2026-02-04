@@ -340,9 +340,17 @@ subscriptions model =
             minute =
                 60 * 1000
 
+            denominator : Float
+            denominator =
+                toFloat (Tuple.second model.metronome.timeSignature)
+
+            multiplier : Float
+            multiplier =
+                4 / denominator
+
             interval : Float
             interval =
-                minute / model.metronome.bpm
+                (minute / model.metronome.bpm) * multiplier
         in
         Time.every interval (\_ -> Beat)
 
