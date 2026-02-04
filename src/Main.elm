@@ -183,10 +183,6 @@ beat model =
             else
                 ""
 
-        previousBeat : Int
-        previousBeat =
-            model.metronome.currentBeat
-
         newBar : Int
         newBar =
             if remainder == 0 then
@@ -199,9 +195,22 @@ beat model =
         metronome =
             findBarConfigMetronome newBar model.barConfig
 
+        newCurrentBeat : Int
+        newCurrentBeat =
+            if model.metronome.timeSignature == metronome.timeSignature then
+                let
+                    previousBeat : Int
+                    previousBeat =
+                        model.metronome.currentBeat
+                in
+                previousBeat + 1
+
+            else
+                1
+
         newMetronome : Metronome
         newMetronome =
-            { metronome | currentBeat = previousBeat + 1, remainder = remainder, currentBar = newBar }
+            { metronome | currentBeat = newCurrentBeat, remainder = remainder, currentBar = newBar }
     in
     ( { model | metronome = newMetronome }, beatClick beatType )
 
