@@ -66,6 +66,7 @@
               cp index.html $out
               cp elm.js $out
               cp ports.js $out
+              cp default.css $out
 
               runHook postInstall
             '';
