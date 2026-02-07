@@ -512,7 +512,7 @@ viewSidebar model =
             , span [] [ text "Enable bar configs" ]
             ]
         , div [] [ text "Bar Configs" ]
-        , div []
+        , div [ Html.Attributes.class "bar-configs-list" ]
             (List.map viewSidebarBarCard model.barConfig)
         , button
             [ onClick AddBarConfig
