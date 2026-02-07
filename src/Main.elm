@@ -365,38 +365,50 @@ subscriptions model =
 viewBeatDots : Model -> Html Msg
 viewBeatDots model =
     let
+        numBeats : Int
+        numBeats =
+            Tuple.first model.metronome.timeSignature
+
+        rem : Int
+        rem =
+            remainderBy numBeats model.metronome.currentBeat
+
+        current : Int
+        current =
+            if rem == 0 then
+                numBeats
+
+            else
+                rem
+
         dots : List (Html Msg)
         dots =
-            List.range 0 (Tuple.first model.metronome.timeSignature - 1)
+            List.range 1 numBeats
                 |> List.map
-                    (\_ ->
+                    (\i ->
                         span
-                            []
+                            [ Html.Attributes.classList [ ( "active", i == current && model.metronome.active ) ] ]
                             []
                     )
     in
-    div [] dots
+    div [ Html.Attributes.class "beat-dots" ] dots
 
 
 view : Model -> Html Msg
 view model =
-    div
-        []
+    div [ Html.Attributes.class "app-container" ]
         [ viewSidebar model
-        , div []
-            [ div
-                []
-                [ viewBpmControl model
-                , viewStartStop model
-                , viewBeatDots model
-                ]
+        , div [ Html.Attributes.class "main-controls" ]
+            [ viewBpmControl model
+            , viewStartStop model
+            , viewBeatDots model
             ]
         ]
 
 
 viewBpmControl : Model -> Html Msg
 viewBpmControl model =
-    div [ style "display" "flex", style "align-items" "center", style "justify-content" "center", style "gap" "22px", style "margin-bottom" "20px" ]
+    div [ Html.Attributes.class "bpm-control" ]
         [ span [] [ text ("BPM: " ++ String.fromFloat model.metronome.bpm) ]
         , Html.input
             [ type_ "range"
@@ -426,7 +438,7 @@ viewBpmControl model =
 
 viewStartStop : Model -> Html Msg
 viewStartStop model =
-    div []
+    div [ Html.Attributes.class "startstop" ]
         [ if model.metronome.active then
             button
                 [ onClick Stop
@@ -443,8 +455,7 @@ viewStartStop model =
 
 viewSidebarBarCard : BarConfig -> Html Msg
 viewSidebarBarCard barConfig =
-    div
-        []
+    div [ Html.Attributes.class "bar-card" ]
         [ div []
             [ text "Bar number"
             , Html.input
@@ -490,8 +501,7 @@ viewSidebarBarCard barConfig =
 
 viewSidebar : Model -> Html Msg
 viewSidebar model =
-    div
-        []
+    div [ Html.Attributes.class "sidebar" ]
         [ div []
             [ Html.input
                 [ Html.Attributes.type_ "checkbox"

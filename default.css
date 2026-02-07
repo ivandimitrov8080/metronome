@@ -1,0 +1,230 @@
+/* === Dark Glassy Studio Theme === */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Montserrat", "Segoe UI", Arial, sans-serif;
+  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+  color: #f3f4f6;
+  min-height: 100vh;
+}
+
+body,
+#root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.app-container {
+  display: flex;
+  gap: 36px;
+  background: rgba(34, 38, 41, 0.85);
+  border-radius: 22px;
+  box-shadow:
+    0 8px 40px 0 rgba(0, 0, 0, 0.25),
+    0 1.5px 4px 0 rgba(0, 0, 0, 0.1);
+  padding: 44px 56px;
+  margin: 60px 0;
+  min-width: 340px;
+  max-width: 740px;
+  width: 100%;
+  backdrop-filter: blur(8px);
+}
+
+.sidebar {
+  min-width: 220px;
+  max-width: 260px;
+  padding-right: 28px;
+  border-right: 1.5px solid #35373a;
+}
+
+.sidebar h2 {
+  font-size: 1.15rem;
+  margin: 0 0 14px 0;
+  font-weight: 700;
+  color: #a5b4fc;
+  letter-spacing: 0.5px;
+}
+
+.sidebar label,
+.sidebar span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  font-size: 1rem;
+  color: #e0e7ef;
+}
+
+.sidebar .bar-card {
+  background: linear-gradient(135deg, #232526 60%, #35373a 100%);
+  border-radius: 14px;
+  padding: 18px 14px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.13);
+  border: 1.5px solid #35373a;
+}
+
+.sidebar .bar-card input,
+.sidebar .bar-card select {
+  margin-top: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  font-size: 1rem;
+  background: #232526;
+  color: #f3f4f6;
+  box-shadow: 0 1px 2px #18191a inset;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+.sidebar .bar-card input:focus,
+.sidebar .bar-card select:focus {
+  box-shadow: 0 0 0 2px #a5b4fc;
+}
+
+.sidebar button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 0;
+  background: linear-gradient(90deg, #6366f1 0%, #60a5fa 100%);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.13);
+  transition:
+    background 0.18s,
+    box-shadow 0.18s;
+}
+.sidebar button:hover {
+  background: linear-gradient(90deg, #818cf8 0%, #38bdf8 100%);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18);
+}
+
+/* Main controls */
+.main-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+}
+
+.bpm-control {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.bpm-control span {
+  font-size: 1.13rem;
+  font-weight: 600;
+  color: #a5b4fc;
+  letter-spacing: 0.5px;
+}
+
+.bpm-control input[type="range"] {
+  width: 130px;
+  accent-color: #6366f1;
+  background: transparent;
+}
+
+.bpm-control select {
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: none;
+  font-size: 1rem;
+  background: #232526;
+  color: #f3f4f6;
+  box-shadow: 0 1px 2px #18191a inset;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+.bpm-control select:focus {
+  box-shadow: 0 0 0 2px #60a5fa;
+}
+
+.startstop {
+  margin: 22px 0 0 0;
+}
+
+.startstop button {
+  padding: 14px 44px;
+  font-size: 1.15rem;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(90deg, #10b981 0%, #22d3ee 100%);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.13);
+  transition:
+    background 0.18s,
+    box-shadow 0.18s;
+}
+.startstop button:hover {
+  background: linear-gradient(90deg, #22d3ee 0%, #10b981 100%);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.18);
+}
+.startstop button:disabled {
+  background: #35373a;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* Beat dots */
+.beat-dots {
+  display: flex;
+  gap: 18px;
+  margin-top: 34px;
+  justify-content: center;
+}
+
+.beat-dots span {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #35373a;
+  box-shadow: 0 2px 8px #18191a inset;
+  border: 2.5px solid #232526;
+  transition:
+    background 0.2s,
+    border 0.2s,
+    box-shadow 0.2s;
+}
+
+.beat-dots span.active {
+  background: linear-gradient(135deg, #6366f1 60%, #60a5fa 100%);
+  border: 2.5px solid #a5b4fc;
+  box-shadow:
+    0 0 0 4px #818cf8,
+    0 2px 8px #18191a inset;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .app-container {
+    flex-direction: column;
+    padding: 28px 8px;
+    margin: 28px 0;
+    max-width: 98vw;
+  }
+  .sidebar {
+    border-right: none;
+    border-bottom: 1.5px solid #35373a;
+    padding-right: 0;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    max-width: 100%;
+  }
+}
