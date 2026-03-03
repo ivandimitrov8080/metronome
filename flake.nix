@@ -106,15 +106,15 @@
                       elmls.enable = true;
                     };
                   })
-                  nodePackages.browser-sync
+                  python3Packages.livereload
                   watchexec
                 ];
                 processes =
                   let
-                    browserSync = "browser-sync start --server --files index.html elm.js ports.js";
+                    livereload = "livereload --host localhost --port 3000 -o 1 -t . .";
                     watcher = "watchexec -- devenv tasks run build";
                     syncElmDeps =
-                      pkgs.writeScript "sync_elm_deps"
+                      pkgs.writers.writeBash "sync_elm_deps"
                         # bash
                         ''
                           elm2nix convert | ${pkgs.nixfmt}/bin/nixfmt -f elm-srcs.nix > elm-srcs.nix
@@ -127,7 +127,7 @@
                       '';
                   in
                   {
-                    browser-sync.exec = browserSync;
+                    livereload.exec = livereload;
                     watcher.exec = watcher;
                     elm2nix-watcher.exec = elm2nixWatcher;
                   };
