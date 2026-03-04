@@ -145,14 +145,14 @@
                     exec = "elm-test";
                   };
                 };
-                git-hooks.hooks = {
-                  nixfmt.enable = true;
-                  prettier.enable = true;
-                  elm-format.enable = true;
-                  deadnix.enable = true;
-                  statix.enable = true;
-                  elm-review.enable = true;
-                };
+                # git-hooks.hooks = {
+                #   nixfmt.enable = true;
+                #   prettier.enable = true;
+                #   elm-format.enable = true;
+                #   deadnix.enable = true;
+                #   statix.enable = true;
+                #   elm-review.enable = true;
+                # };
               }
             ];
           };
