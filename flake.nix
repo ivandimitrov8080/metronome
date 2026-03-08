@@ -174,12 +174,14 @@
           };
         }).config.build.wrapper
       );
+      checks = eachSystem (system: devShells.${system} // packages.${system});
     in
     {
       inherit
         devShells
         formatter
         packages
+        checks
         ;
     };
 }
