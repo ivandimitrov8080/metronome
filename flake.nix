@@ -5,12 +5,10 @@
     systems.url = "github:nix-systems/default";
     # nvim config helper
     nixvim-flake.url = "github:nix-community/nixvim";
-    nixvim-flake.inputs.nixpkgs.follows = "nixpkgs";
     # neovim latest version
     neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
     neovim-nightly-overlay.inputs.nixpkgs.follows = "nixpkgs";
     devenv.url = "github:cachix/devenv";
-    devenv.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.url = "github:numtide/treefmt-nix";
   };
   outputs =
