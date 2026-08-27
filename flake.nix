@@ -1,23 +1,14 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    configuration.url = "github:ivandimitrov8080/configuration.nix";
     systems.url = "github:nix-systems/default";
-    # nvim config helper
-    nixvim-flake.url = "github:nix-community/nixvim";
-    # neovim latest version
-    neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
-    neovim-nightly-overlay.inputs.nixpkgs.follows = "nixpkgs";
     devenv.url = "github:cachix/devenv";
     treefmt-nix.url = "github:numtide/treefmt-nix";
   };
   outputs =
     inputs@{
       nixpkgs,
-      configuration,
       systems,
-      nixvim-flake,
-      neovim-nightly-overlay,
       devenv,
       treefmt-nix,
       ...
@@ -74,17 +65,8 @@
       devShells = eachSystem (
         system:
         let
-          nixvim-default = nixvim-flake.legacyPackages.${system}.makeNixvim {
-            package = neovim-nightly-overlay.packages.${system}.default;
-          };
           pkgs = import nixpkgs {
             inherit system;
-            overlays = [
-              (_final: _prev: {
-                nixvim = nixvim-default;
-              })
-              configuration.overlays.default
-            ];
           };
         in
         {
@@ -99,11 +81,6 @@
                   elmPackages.elm-json
                   elmPackages.elm-test
                   elm2nix
-                  (nixvim.web.extend {
-                    lsp.servers = {
-                      elmls.enable = true;
-                    };
-                  })
                   python3Packages.livereload
                   watchexec
                 ];
